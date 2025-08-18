@@ -1,0 +1,233 @@
+{
+  "dataset": "Amazon Reviews 5-Class Rating Prediction",
+  "timestamp": "20250815_180252",
+  "experiment_id": "20250815_180252",
+  "configuration": {
+    "n_classes": 5,
+    "random_seed": 42,
+    "cv_folds": 5
+  },
+  "results_summary": {
+    "best_baseline": {
+      "model": "voting_ensemble",
+      "accuracy": 0.59
+    },
+    "mainmodel_optimized": {
+      "accuracy": 0.56,
+      "star_mae": 0.75
+    },
+    "best_cv_model": "RandomForest_Combined"
+  },
+  "saved_files": {
+    "seed_1": {
+      "baseline": {
+        "individual_results": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_results.json",
+        "summary": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/summary.json",
+        "performance_csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/performance_comparison.csv",
+        "detailed_report": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/detailed_report.txt",
+        "individual_predictions": {
+          "text_rf": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/text_rf_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/text_rf_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/text_rf_predictions.npy"
+          },
+          "text_lr": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/text_lr_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/text_lr_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/text_lr_predictions.npy"
+          },
+          "text_mlp": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/text_mlp_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/text_mlp_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/text_mlp_predictions.npy"
+          },
+          "metadata_rf": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/metadata_rf_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/metadata_rf_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/metadata_rf_predictions.npy"
+          },
+          "metadata_lr": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/metadata_lr_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/metadata_lr_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/metadata_lr_predictions.npy"
+          },
+          "metadata_gb": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/metadata_gb_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/metadata_gb_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/metadata_gb_predictions.npy"
+          },
+          "combined_rf": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_rf_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_rf_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_rf_predictions.npy"
+          },
+          "combined_lr": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_lr_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_lr_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_lr_predictions.npy"
+          },
+          "combined_mlp": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_mlp_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_mlp_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_mlp_predictions.npy"
+          },
+          "combined_gb": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_gb_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_gb_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_gb_predictions.npy"
+          },
+          "combined_svm": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_svm_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_svm_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_svm_predictions.npy"
+          },
+          "combined_knn": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_knn_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_knn_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_knn_predictions.npy"
+          },
+          "combined_nb": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_nb_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_nb_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_nb_predictions.npy"
+          },
+          "combined_dt": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_dt_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_dt_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/combined_dt_predictions.npy"
+          },
+          "xgboost": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/xgboost_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/xgboost_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/xgboost_predictions.npy"
+          },
+          "extra_trees": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/extra_trees_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/extra_trees_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/extra_trees_predictions.npy"
+          },
+          "ada_boost": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/ada_boost_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/ada_boost_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/ada_boost_predictions.npy"
+          },
+          "voting_ensemble": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/voting_ensemble_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/voting_ensemble_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/voting_ensemble_predictions.npy"
+          },
+          "late_fusion_voting": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/late_fusion_voting_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/late_fusion_voting_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/late_fusion_voting_predictions.npy"
+          },
+          "late_fusion_stacking": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/late_fusion_stacking_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/late_fusion_stacking_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/late_fusion_stacking_predictions.npy"
+          },
+          "attention_fusion": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/attention_fusion_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/attention_fusion_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/attention_fusion_predictions.npy"
+          },
+          "tensor_fusion": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/tensor_fusion_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/tensor_fusion_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/tensor_fusion_predictions.npy"
+          },
+          "multiplicative_fusion": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/multiplicative_fusion_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/multiplicative_fusion_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/multiplicative_fusion_predictions.npy"
+          },
+          "wide_and_deep": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/wide_and_deep_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/wide_and_deep_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/wide_and_deep_predictions.npy"
+          },
+          "stacking_ensemble": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/stacking_ensemble_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/stacking_ensemble_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/stacking_ensemble_predictions.npy"
+          },
+          "deep_neural_net": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/deep_neural_net_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/deep_neural_net_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/deep_neural_net_predictions.npy"
+          },
+          "wide_neural_net": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/wide_neural_net_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/wide_neural_net_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/wide_neural_net_predictions.npy"
+          },
+          "regularized_neural_net": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/regularized_neural_net_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/regularized_neural_net_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/individual_predictions/regularized_neural_net_predictions.npy"
+          }
+        },
+        "all_predictions": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/01_baseline_models/all_predictions.pkl"
+      },
+      "hyperparameter": {
+        "best_params": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/02_hyperparameter_tuning/best_parameters.json",
+        "trial_history": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/02_hyperparameter_tuning/trial_history.json",
+        "summary": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/02_hyperparameter_tuning/optimization_summary.txt",
+        "parameter_importance": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/02_hyperparameter_tuning/parameter_importance.json"
+      },
+      "main_model": {
+        "final_metrics": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/final_metrics.json",
+        "model_config": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/model_configuration.json",
+        "performance_report": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/performance_report.txt",
+        "test_predictions": {
+          "simple_test": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/test_predictions/mainmodel_simple_test_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/test_predictions/mainmodel_simple_test_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/test_predictions/mainmodel_simple_test_predictions.npy"
+          },
+          "optimized_test": {
+            "json": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/test_predictions/mainmodel_optimized_test_predictions.json",
+            "csv": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/test_predictions/mainmodel_optimized_test_predictions.csv",
+            "numpy": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/test_predictions/mainmodel_optimized_test_predictions.npy"
+          }
+        },
+        "all_predictions": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/03_main_model/all_predictions.pkl"
+      },
+      "cross_validation": {
+        "cv_statistics": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/04_cross_validation/cv_statistics.json",
+        "fold_results": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/04_cross_validation/fold_results.json",
+        "cv_analysis": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/04_cross_validation/cv_analysis.txt",
+        "stability_metrics": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/04_cross_validation/stability_metrics.json"
+      },
+      "interpretability": {
+        "feature_importance": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/05_interpretability/feature_importance.json",
+        "model_insights": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/05_interpretability/model_insights.json",
+        "interpretability_report": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/05_interpretability/interpretability_report.txt",
+        "error_analysis": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/05_interpretability/error_analysis.json"
+      },
+      "ablation": {
+        "modality_contributions": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/06_ablation_studies/modality_contributions.json",
+        "strategy_comparison": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/06_ablation_studies/strategy_comparison.json",
+        "ablation_analysis": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/06_ablation_studies/ablation_analysis.txt"
+      },
+      "robustness": {
+        "robustness_tests": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/07_robustness_analysis/robustness_tests.json",
+        "robustness_report": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/07_robustness_analysis/robustness_report.txt"
+      },
+      "raw_data": {
+        "complete_results": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/09_raw_data/complete_results.pkl",
+        "all_predictions": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/seed_1/09_raw_data/all_predictions.pkl"
+      }
+    },
+    "aggregate": {
+      "cross_seed_summary": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/aggregate_results/cross_seed_summary.json",
+      "statistical_tests": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/aggregate_results/statistical_tests.json",
+      "performance_table": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/aggregate_results/aggregate_performance.csv"
+    },
+    "summary": {
+      "executive_summary": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/experiment_summary/executive_summary.txt",
+      "configuration": "/Users/pranav/Coding/Projects/PolyModalEnsemble/Benchmarking/Experiments/AmazonReviews/results/run_20250815_180252/experiment_summary/experiment_configuration.json"
+    }
+  },
+  "creation_time": "2025-08-15T18:04:43.898143"
+}

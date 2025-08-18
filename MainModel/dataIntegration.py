@@ -53,6 +53,15 @@ class DataLoaderInterface(ABC):
 
 # --- GenericMultiModalDataLoader ---
 class GenericMultiModalDataLoader:
+    def __init__(self, validate_data: bool = True, memory_efficient: bool = False):
+        self.validate_data = validate_data
+        self.memory_efficient = memory_efficient
+        self.data: Dict[str, Any] = {}
+        self.modality_configs: List[ModalityConfig] = []
+        self._data_stats: Dict[str, Any] = {}
+        self._sample_size: int = 0
+        self._quality_report: Optional[Dict[str, Any]] = None
+
     def add_modality_split(self, name: str, train_data: np.ndarray, test_data: np.ndarray, data_type: str = "tabular", is_required: bool = False, feature_dim: Optional[int] = None):
         """Add both train and test data for a modality."""
         if train_data.ndim == 1:
@@ -61,6 +70,16 @@ class GenericMultiModalDataLoader:
             test_data = test_data.reshape(-1, 1)
         if feature_dim is None:
             feature_dim = train_data.shape[1]
+        
+        # Validate that train and test have same number of features
+        if train_data.shape[1] != test_data.shape[1]:
+            raise ValueError(f"Train and test data for modality '{name}' must have same number of features. Got {train_data.shape[1]} vs {test_data.shape[1]}")
+        
+        # Validate consistency with existing modalities
+        if hasattr(self, '_sample_size') and self._sample_size > 0:
+            if train_data.shape[0] != self._sample_size:
+                raise ValueError(f"Train data for modality '{name}' must have same number of samples as other modalities. Got {train_data.shape[0]} vs {self._sample_size}")
+        
         self.data[f"{name}_train"] = train_data
         self.data[f"{name}_test"] = test_data
         self.modality_configs.append(ModalityConfig(name, data_type, feature_dim, is_required))
@@ -75,6 +94,21 @@ class GenericMultiModalDataLoader:
             train_labels = train_labels.ravel()
         if test_labels.ndim == 2 and test_labels.shape[1] == 1:
             test_labels = test_labels.ravel()
+        
+        # Validate consistency with existing modalities
+        if hasattr(self, '_sample_size') and self._sample_size > 0:
+            if train_labels.shape[0] != self._sample_size:
+                raise ValueError(f"Train labels must have same number of samples as modalities. Got {train_labels.shape[0]} vs {self._sample_size}")
+        
+        # Validate that train and test labels have consistent dimensions
+        if train_labels.ndim != test_labels.ndim:
+            raise ValueError(f"Train and test labels must have same number of dimensions. Got {train_labels.ndim} vs {test_labels.ndim}")
+        
+        # For multi-label classification, validate number of label columns
+        if train_labels.ndim == 2:
+            if train_labels.shape[1] != test_labels.shape[1]:
+                raise ValueError(f"Train and test labels must have same number of label columns. Got {train_labels.shape[1]} vs {test_labels.shape[1]}")
+        
         self.data[f"{name}_train"] = train_labels
         self.data[f"{name}_test"] = test_labels
 
@@ -102,15 +136,6 @@ class GenericMultiModalDataLoader:
         data_dict = {k: v for k, v in self.data.items() if k != labels_key}
         labels = self.data[labels_key]
         return data_dict, labels
-    def __init__(self, validate_data: bool = True, memory_efficient: bool = False):
-        self.validate_data = validate_data
-        self.memory_efficient = memory_efficient
-        self.data: Dict[str, Any] = {}
-        self.modality_configs: List[ModalityConfig] = []
-        self._data_stats: Dict[str, Any] = {}
-        self._sample_size: int = 0
-        self._quality_report: Optional[Dict[str, Any]] = None
-
     def add_modality(self, name: str, data: Union[np.ndarray, str, Path], data_type: str = "tabular", is_required: bool = False, feature_dim: Optional[int] = None):
         # Load from file if needed
         if isinstance(data, (str, Path)):

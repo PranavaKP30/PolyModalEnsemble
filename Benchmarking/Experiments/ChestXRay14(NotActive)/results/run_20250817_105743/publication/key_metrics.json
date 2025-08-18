@@ -1,0 +1,12 @@
+{
+  "experiment_id": "20250817_105743",
+  "dataset": "ChestX-ray14",
+  "baseline_best_f1": 0.3660130718954248,
+  "mainmodel_simple_f1": 0.358974358974359,
+  "mainmodel_optimized_f1": 0.5481404240528328,
+  "robustness_baseline_accuracy": 0,
+  "robustness_missing_image_accuracy": 0,
+  "robustness_missing_text_accuracy": 0,
+  "robustness_missing_metadata_accuracy": 0,
+  "robustness_noisy_image_accuracy": 0
+}

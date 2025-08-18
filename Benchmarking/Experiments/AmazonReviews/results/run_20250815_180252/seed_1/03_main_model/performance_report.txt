@@ -1,0 +1,31 @@
+MAIN MODEL PERFORMANCE REPORT
+===================================
+
+SIMPLE TEST
+--------------------
+Accuracy: 0.5500
+Star MAE: 0.8400
+±1 Star Accuracy: 0.7700
+Star RMSE: 1.4353
+F1 Score: 0.4071
+R² Score: -0.4635
+Training Time: 1.386s
+Inference Time: 0.009s
+
+OPTIMIZED TEST
+--------------------
+Accuracy: 0.5600
+Star MAE: 0.7500
+±1 Star Accuracy: 0.8200
+Star RMSE: 1.3077
+F1 Score: 0.4837
+R² Score: -0.2148
+Training Time: 1.719s
+Inference Time: 0.014s
+
+HYPERPARAMETER OPTIMIZATION
+------------------------------
+Best score: 0.7500
+Total trials: 12
+Optimization time: 19.5s
+

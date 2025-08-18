@@ -1,0 +1,11 @@
+{
+  "total_models": 28,
+  "successful_models": 28,
+  "failed_models": 0,
+  "best_model": "voting_ensemble",
+  "best_accuracy": 0.59,
+  "best_mae": 0.73,
+  "fastest_model": "combined_knn",
+  "fastest_time": 0.0005059242248535156,
+  "total_time": 36.988606691360474
+}

@@ -1,0 +1,11 @@
+ChestX-ray14 Experiment Summary
+========================================
+
+Baseline Models:
+Best Model: naive_bayes
+Best F1: 0.147
+
+Main Model:
+Simple Test F1: 0.359
+Optimized Test F1: 0.548
+

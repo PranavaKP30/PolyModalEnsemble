@@ -1,0 +1,43 @@
+# Core ML and Data Science Libraries
+numpy>=1.21.0
+pandas>=1.3.0
+scikit-learn>=1.0.0
+scipy>=1.7.0
+
+# Deep Learning Framework
+torch>=1.9.0
+torchvision>=0.10.0
+
+# Image Processing
+Pillow>=8.3.0
+opencv-python>=4.5.0
+
+# Text Processing
+transformers>=4.11.0
+tokenizers>=0.10.0
+
+# Visualization
+matplotlib>=3.4.0
+seaborn>=0.11.0
+plotly>=5.0.0
+
+# Utilities
+tqdm>=4.62.0
+joblib>=1.1.0
+psutil>=5.8.0
+
+# Optional: Jupyter for development
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Optional: Hyperparameter optimization
+optuna>=2.10.0
+
+# Optional: Advanced metrics
+tensorboard>=2.7.0
+wandb>=0.12.0
+
+# Development and testing
+pytest>=6.2.0
+black>=21.0.0
+flake8>=3.9.0

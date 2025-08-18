@@ -1,0 +1,22 @@
+STATISTICAL ANALYSIS SUMMARY
+========================================
+
+Cross-Validation Results:
+-------------------------
+RandomForest_Text: 0.5500 ± 0.0261
+RandomForest_Combined: 0.5560 ± 0.0273
+XGBoost_Combined: 0.5540 ± 0.0136
+VotingEnsemble: 0.5500 ± 0.0316
+MainModel: 0.5500 ± 0.0000
+
+Robustness Analysis:
+--------------------
+Noise Resilience:
+  Performance maintained under tested conditions
+Missing Data Handling:
+  Performance maintained under tested conditions
+Class Imbalance Sensitivity:
+  Performance maintained under tested conditions
+Sample Size Sensitivity:
+  Performance maintained under tested conditions
+

@@ -53,7 +53,11 @@ class ModalityDropoutBagger:
 
     @classmethod
     def from_data_integration(cls, integrated_data: Dict[str, np.ndarray], modality_configs: List[Any], integration_metadata: Dict[str, Any], n_bags: int = 20, dropout_strategy: str = "adaptive", max_dropout_rate: float = 0.5, **kwargs) -> "ModalityDropoutBagger":
-        return cls(modality_configs, integration_metadata, n_bags, dropout_strategy, max_dropout_rate, **kwargs)
+        # Create instance with proper parameters
+        instance = cls(modality_configs, integration_metadata, n_bags, dropout_strategy, max_dropout_rate, **kwargs)
+        # Store integrated data for later use
+        instance.integrated_data = integrated_data
+        return instance
 
     def _validate_params(self):
         assert 1 <= self.n_bags <= 1000, "n_bags out of range"

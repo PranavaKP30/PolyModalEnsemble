@@ -279,9 +279,10 @@ class EnsembleTrainingPipeline:
         return None
 
 # --- Factory Function ---
-def create_training_pipeline(task_type: str = "classification", num_classes: int = 2, enable_denoising: bool = True, epochs: int = 50, **kwargs) -> EnsembleTrainingPipeline:
+def create_training_pipeline(task_type: str = "classification", num_classes: int = 2, enable_denoising: bool = True, epochs: int = 50, batch_size: int = 32, **kwargs) -> EnsembleTrainingPipeline:
     config = AdvancedTrainingConfig(
         epochs=epochs,
+        batch_size=batch_size,
         enable_denoising=enable_denoising,
         task_type=task_type,
         **kwargs

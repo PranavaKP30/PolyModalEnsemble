@@ -95,6 +95,92 @@ class EnsemblePredictor:
     def predict(self, data: Dict[str, np.ndarray], return_uncertainty: bool = True) -> PredictionResult:
         """
         Predict using all trained learners. Handles torch/sklearn, fusion/single, classification/regression, real confidence.
+        Returns a PredictionResult object with predictions, confidence, uncertainty, and metadata.
+        """
+        return self._predict_internal(data, return_uncertainty)
+    
+    def predict_classes(self, data: Dict[str, np.ndarray]) -> np.ndarray:
+        """
+        sklearn-like interface: returns class predictions directly as numpy array.
+        For classification tasks only.
+        """
+        if self.task_type != "classification":
+            raise ValueError("predict_classes() is only available for classification tasks")
+        result = self._predict_internal(data, return_uncertainty=False)
+        return result.predictions
+    
+    def predict_values(self, data: Dict[str, np.ndarray]) -> np.ndarray:
+        """
+        sklearn-like interface: returns regression values directly as numpy array.
+        For regression tasks only.
+        """
+        if self.task_type != "regression":
+            raise ValueError("predict_values() is only available for regression tasks")
+        result = self._predict_internal(data, return_uncertainty=False)
+        return result.predictions
+    
+    def predict_proba(self, data: Dict[str, np.ndarray]) -> np.ndarray:
+        """
+        sklearn-like interface: returns probability predictions directly as numpy array.
+        For classification tasks only.
+        """
+        if self.task_type != "classification":
+            raise ValueError("predict_proba() is only available for classification tasks")
+        
+        # Get individual learner probabilities
+        all_probas = []
+        n_samples = next(iter(data.values())).shape[0] if data else 0
+        
+        for learner in self.trained_learners:
+            if hasattr(learner, 'predict_proba'):
+                try:
+                    # Try dict input first
+                    if hasattr(learner, 'predict_proba') and 'X' in learner.predict_proba.__code__.co_varnames:
+                        try:
+                            proba = learner.predict_proba(data)
+                            all_probas.append(proba)
+                            continue
+                        except Exception:
+                            pass
+                    
+                    # Fallback to array input
+                    proba = learner.predict_proba(np.column_stack([data[k] for k in sorted(data)]))
+                    all_probas.append(proba)
+                except Exception:
+                    # If no predict_proba, create one-hot from predictions
+                    pred = learner.predict(np.column_stack([data[k] for k in sorted(data)]))
+                    n_classes = max(pred) + 1
+                    proba = np.zeros((len(pred), n_classes))
+                    proba[np.arange(len(pred)), pred] = 1.0
+                    all_probas.append(proba)
+        
+        if not all_probas:
+            raise ValueError("No learners with predict_proba capability found")
+        
+        # Ensure all probability arrays have the same shape
+        # Find the maximum number of classes across all learners
+        max_classes = max(proba.shape[1] for proba in all_probas)
+        
+        # Pad or truncate all probability arrays to have the same number of classes
+        normalized_probas = []
+        for proba in all_probas:
+            if proba.shape[1] < max_classes:
+                # Pad with zeros
+                padded_proba = np.zeros((proba.shape[0], max_classes))
+                padded_proba[:, :proba.shape[1]] = proba
+                normalized_probas.append(padded_proba)
+            elif proba.shape[1] > max_classes:
+                # Truncate (shouldn't happen, but just in case)
+                normalized_probas.append(proba[:, :max_classes])
+            else:
+                normalized_probas.append(proba)
+        
+        # Average probabilities across learners
+        return np.mean(normalized_probas, axis=0)
+    
+    def _predict_internal(self, data: Dict[str, np.ndarray], return_uncertainty: bool = True) -> PredictionResult:
+        """
+        Internal prediction method that returns PredictionResult object.
         """
         import torch.nn.functional as F
         predictions = []
@@ -138,20 +224,30 @@ class EnsemblePredictor:
             # Custom dict-based learner (BaseLearnerInterface): expects dict input
             elif hasattr(learner, 'predict_proba') and 'X' in learner.predict_proba.__code__.co_varnames:
                 try:
-                    proba = learner.predict_proba(data)
-                    pred = np.argmax(proba, axis=1)
-                    conf = np.max(proba, axis=1)
+                    if self.task_type == "classification":
+                        proba = learner.predict_proba(data)
+                        pred = np.argmax(proba, axis=1)
+                        conf = np.max(proba, axis=1)
+                    else:
+                        # Regression: no predict_proba, use predict
+                        pred = learner.predict(data)
+                        conf = np.ones_like(pred, dtype=float)
                     predictions.append(pred)
                     confidences.append(conf)
                 except Exception:
                     # fallback to array if fails
-                    proba = learner.predict_proba(np.column_stack([data[k] for k in sorted(data)]))
-                    pred = np.argmax(proba, axis=1)
-                    conf = np.max(proba, axis=1)
+                    if self.task_type == "classification" and hasattr(learner, 'predict_proba'):
+                        proba = learner.predict_proba(np.column_stack([data[k] for k in sorted(data)]))
+                        pred = np.argmax(proba, axis=1)
+                        conf = np.max(proba, axis=1)
+                    else:
+                        # Regression or no predict_proba
+                        pred = learner.predict(np.column_stack([data[k] for k in sorted(data)]))
+                        conf = np.ones_like(pred, dtype=float)
                     predictions.append(pred)
                     confidences.append(conf)
             # Sklearn model: expects array input
-            elif hasattr(learner, 'predict_proba'):
+            elif hasattr(learner, 'predict_proba') and self.task_type == "classification":
                 proba = learner.predict_proba(np.column_stack([data[k] for k in sorted(data)]))
                 pred = np.argmax(proba, axis=1)
                 conf = np.max(proba, axis=1)
@@ -173,17 +269,28 @@ class EnsemblePredictor:
         predictions = np.array(predictions)
         confidences = np.array(confidences)
         # Aggregation
-        if self.aggregation_strategy == AggregationStrategy.MAJORITY_VOTE:
-            final_pred = self._majority_vote(predictions)
-        elif self.aggregation_strategy == AggregationStrategy.WEIGHTED_VOTE:
-            weights = np.array([m['metrics'].get('accuracy', 0.5) for m in sorted_metadata])
-            final_pred = self._weighted_vote(predictions, weights)
-        elif self.aggregation_strategy == AggregationStrategy.TRANSFORMER_FUSION and self.transformer_meta_learner:
-            x = torch.tensor(predictions, dtype=torch.float32).unsqueeze(-1).to(self.device)
-            logits, attn_weights = self.transformer_meta_learner(x)
-            final_pred = torch.argmax(logits, dim=-1).cpu().numpy()
+        if self.task_type == "regression":
+            # For regression, use mean or weighted mean
+            if self.aggregation_strategy == AggregationStrategy.WEIGHTED_VOTE:
+                weights = np.array([m['metrics'].get('r2_score', 0.5) for m in sorted_metadata])
+                weights = weights / np.sum(weights)  # Normalize weights
+                final_pred = np.average(predictions, axis=0, weights=weights)
+            else:
+                # Default to mean for regression
+                final_pred = np.mean(predictions, axis=0)
         else:
-            final_pred = predictions[0] if len(predictions) > 0 else np.array([])
+            # Classification aggregation
+            if self.aggregation_strategy == AggregationStrategy.MAJORITY_VOTE:
+                final_pred = self._majority_vote(predictions)
+            elif self.aggregation_strategy == AggregationStrategy.WEIGHTED_VOTE:
+                weights = np.array([m['metrics'].get('accuracy', 0.5) for m in sorted_metadata])
+                final_pred = self._weighted_vote(predictions, weights)
+            elif self.aggregation_strategy == AggregationStrategy.TRANSFORMER_FUSION and self.transformer_meta_learner:
+                x = torch.tensor(predictions, dtype=torch.float32).unsqueeze(-1).to(self.device)
+                logits, attn_weights = self.transformer_meta_learner(x)
+                final_pred = torch.argmax(logits, dim=-1).cpu().numpy()
+            else:
+                final_pred = predictions[0] if len(predictions) > 0 else np.array([])
         # Confidence
         avg_conf = np.mean(confidences, axis=0) if confidences.size > 0 else None
         # Uncertainty

@@ -1,0 +1,7 @@
+{
+  "n_bags": 3,
+  "dropout_strategy": "adaptive",
+  "epochs": 5,
+  "batch_size": 128,
+  "random_state": 438878439
+}

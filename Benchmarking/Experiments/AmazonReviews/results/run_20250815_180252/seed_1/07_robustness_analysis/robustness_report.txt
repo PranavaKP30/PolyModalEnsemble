@@ -1,0 +1,31 @@
+ROBUSTNESS ANALYSIS
+====================
+
+NOISE RESILIENCE
+----------------
+Baseline accuracy: 0.0000
+Robust accuracy: 0.0000
+Performance drop: 0.0000
+Status: DEGRADED
+
+MISSING DATA HANDLING
+---------------------
+Baseline accuracy: 0.0000
+Robust accuracy: 0.0000
+Performance drop: 0.0000
+Status: DEGRADED
+
+CLASS IMBALANCE SENSITIVITY
+---------------------------
+Baseline accuracy: 0.0000
+Robust accuracy: 0.0000
+Performance drop: 0.0000
+Status: DEGRADED
+
+SAMPLE SIZE SENSITIVITY
+-----------------------
+Baseline accuracy: 0.0000
+Robust accuracy: 0.0000
+Performance drop: 0.0000
+Status: DEGRADED
+

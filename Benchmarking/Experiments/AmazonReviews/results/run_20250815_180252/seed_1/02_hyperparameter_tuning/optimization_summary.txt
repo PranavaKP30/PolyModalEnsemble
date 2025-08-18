@@ -1,0 +1,20 @@
+HYPERPARAMETER OPTIMIZATION SUMMARY
+========================================
+
+OPTIMIZATION RESULTS
+--------------------
+Best score (MAE): 0.7500
+Total trials: 12
+Successful trials: 12
+Optimization time: 19.5 seconds
+
+BEST PARAMETERS
+---------------
+  n_bags: 5
+  dropout_strategy: linear
+  epochs: 10
+  batch_size: 256
+  random_state: 49
+
+TRIAL SUMMARY
+---------------

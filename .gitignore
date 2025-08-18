@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Mac
+.DS_Store
+
+# CatBoost temporary files (auto-generated during training)
+catboost_info/
+
+# Experiment results (comment out if you want to track results)
+# results/
+# *.pkl
+# *.json
+
+# Model checkpoints and temporary files
+*.tmp
+*.temp
+checkpoint*/
+logs/
+
+# Data files (if too large for git)
+# *.csv
+# *.json
+# *.pkl
+# *.npy
+
+# Benchmarking datasets (large data folders)
+Benchmarking/Data/AmazonReviews/
+Benchmarking/Data/ChestXRay(NotActive)/
+Benchmarking/Data/ChestXRay14(NotActive)/
+Benchmarking/Data/CocoCaptions/
+Benchmarking/Data/YelpOpen/
+
+# Benchmarking processed data folders
+Benchmarking/ProcessedData/AmazonReviews/
+Benchmarking/ProcessedData/ChestXRay(NotActive)/
+Benchmarking/ProcessedData/ChestXRay14(NotActive)/
+Benchmarking/ProcessedData/CocoCaptions/
+Benchmarking/ProcessedData/YelpOpen/
