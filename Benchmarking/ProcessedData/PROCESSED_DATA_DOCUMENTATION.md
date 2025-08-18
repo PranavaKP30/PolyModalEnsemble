@@ -3,6 +3,8 @@
 ## Overview
 This document provides comprehensive information about all preprocessed datasets ready for multimodal ensemble learning experimentation. Each dataset has been transformed from raw data into machine learning-ready features using dedicated preprocessing pipelines.
 
+**⚠️ NOTE: Current data reflects 10-sample test runs. Full dataset conversion pending.**
+
 **Datasets Available:**
 - [Amazon Reviews](#amazon-reviews---processed-data) - E-commerce rating prediction
 - [COCO Captions](#coco-captions---processed-data) - Image-text retrieval
@@ -53,16 +55,16 @@ PreprocessedData/AmazonReviews/
 ### **Dataset Characteristics**
 - **Task Type**: Regression (rating prediction)
 - **Label Range**: 1.0 - 5.0 stars (Amazon rating scale)
-- **Train Samples**: 800 reviews
-- **Test Samples**: 200 reviews
+- **Train Samples**: 8 reviews (test run)
+- **Test Samples**: 2 reviews (test run)
 - **Split Ratio**: 80% / 20% (stratified by rating)
 - **Domain**: E-commerce product reviews (Electronics category)
 
 ### **Multimodal Feature Structure**
-- **Text Modality**: 1,000 TF-IDF features from review text + summary
-- **Metadata Modality**: 12 structured features (price, votes, statistics)
-- **Image Modality**: 12,288 synthetic product image features (64×64×3)
-- **Total Features**: 13,300 multimodal features per sample
+- **Text Modality**: 65 TF-IDF features from review text + summary
+- **Metadata Modality**: 14 structured features (price, votes, statistics, derived features)
+- **Image Modality**: ❌ NOT INCLUDED (no image features in current version)
+- **Total Features**: 79 multimodal features per sample
 
 ---
 
@@ -364,7 +366,7 @@ loader.add_labels_split(
 
 ---
 
-**Generated:** August 4, 2025  
+**Generated:** August 18, 2025  
 **Implementation**: AmazonReviewsPreProcess.py  
 **Dataset Source**: Stanford SNAP Amazon Product Reviews  
 **Status**: ✅ AMAZON REVIEWS PREPROCESSED DATA READY  

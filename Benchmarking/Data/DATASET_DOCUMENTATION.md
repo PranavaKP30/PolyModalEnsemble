@@ -3,6 +3,9 @@
 ## Overview
 This document provides comprehensive information about the **four carefully selected datasets** used for benchmarking the Modality-Aware Ensemble Learning Framework. These datasets provide diverse multimodal scenarios across different domains, task types, and modality combinations to thoroughly evaluate the framework's capabilities.
 
+**Last Updated**: August 18, 2024
+**Status**: All datasets downloaded and preprocessing scripts implemented
+
 ## 🎯 **Strategic Dataset Selection**
 Our 4-dataset portfolio covers:
 - **Different modality combinations**: 2-modality and 3-modality scenarios
@@ -39,27 +42,30 @@ wget https://snap.stanford.edu/data/amazon/productGraph/categoryFiles/reviews_Gr
 - **Distribution**: 1=Very Negative, 2=Negative, 3=Neutral, 4=Positive, 5=Very Positive
 - **Encoding**: Direct numerical values (1, 2, 3, 4, 5)
 
-### 📝 **Raw Features (Data/AmazonReviews/train.csv)**
+### 📝 **Raw Features (Data/AmazonReviews/)**
 | Feature | Type | Description | Example |
 |---------|------|-------------|---------|
 | `reviewText` | Text | Customer review content | "This product is amazing! I love it so much." |
 | `summary` | Text | Review title/summary | "Amazing product" |
 | `overall` | Numerical | Rating score (1-5) | 5 |
 | `helpful` | List | Helpfulness votes [helpful, total] | "[2, 3]" |
+| `asin` | String | Product identifier | "B000JVER7W" |
 | `price` | Numerical | Product price in dollars | 75.92 |
-| `productCategory` | Categorical | Product category | "Electronics" |
+| `category` | Categorical | Product category | "Electronics" |
 | `brand` | Categorical | Product brand name | "BrandA" |
 
 ### 🔧 **Processed Features**
-#### Text Features (75 dimensions)
+#### Text Features (1000 dimensions)
 - **Method**: TF-IDF Vectorization
-- **Features**: Top 75 most important n-grams (1-gram and 2-gram)
+- **Features**: Top 1000 most important n-grams (1-gram and 2-gram)
 - **Source**: Combined `reviewText` + `summary`
 - **Preprocessing**: Lowercasing, stopword removal, special character cleaning
 
-#### Metadata Features (10 dimensions)
+#### Metadata Features (14 dimensions)
 - `price`: Product price (scaled)
 - `helpful_votes`: Number of helpful votes (scaled)
+- `total_votes`: Total votes (helpful + unhelpful)
+- `helpful_ratio`: Ratio of helpful to total votes [0-1]
 - `category_encoded`: Product category (label encoded)
 - `brand_encoded`: Brand name (label encoded)
 - `review_length`: Character count of review text
@@ -68,12 +74,12 @@ wget https://snap.stanford.edu/data/amazon/productGraph/categoryFiles/reviews_Gr
 - `sentence_count`: Number of sentences
 - `exclamation_count`: Number of exclamation marks
 - `question_count`: Number of question marks
+- `review_length * word_count`: Derived feature
+- `helpful_ratio * total_votes`: Derived feature
 
-#### Image Features (150,528 dimensions)
-- **Format**: Synthetic product images (224×224×3 RGB)
-- **Generation**: Created based on product category and features
-- **Preprocessing**: Normalized to [0,1], flattened to vector
-- **Purpose**: Simulate multimodal e-commerce scenario
+#### Image Features (None)
+- **Note**: Current processed data does not include image features
+- **Reason**: Matches existing processed data format
 
 ### 🎛️ **Modalities Present**
 1. **Text Modality**: Review content and summaries
@@ -82,9 +88,10 @@ wget https://snap.stanford.edu/data/amazon/productGraph/categoryFiles/reviews_Gr
 4. **Temporal Features**: Text statistics and engagement metrics
 
 ### 📊 **Dataset Statistics**
-- **Total Samples**: 1,000 (processed subset)
-- **Train Split**: 800 samples (80%)
-- **Test Split**: 200 samples (20%)
+- **Total Samples**: 1,689,188 (raw data)
+- **Current Processed**: 200,000 samples
+- **Train Split**: 160,000 samples (80%)
+- **Test Split**: 40,000 samples (20%)
 - **Missing Values**: Handled during preprocessing
 - **Class Balance**: Distributed across rating levels
 
@@ -117,10 +124,10 @@ unzip annotations_trainval2017.zip
 - **Alternative**: Caption generation/ranking
 
 ### 🏷️ **Output Labels**
-- **Label Type**: Multiple captions per image (5 captions per image)
-- **Format**: Natural language descriptions
-- **Examples**: "A person riding a skateboard on a street", "Two dogs playing in a park"
-- **Evaluation**: BLEU, METEOR, CIDEr, SPICE scores
+- **Label Type**: Binary classification (image-caption matching)
+- **Format**: 0.0 (negative pair) or 1.0 (positive pair)
+- **Task**: Distinguish between correct and incorrect image-caption pairs
+- **Evaluation**: Binary classification metrics (accuracy, precision, recall, F1)
 
 ### 📝 **Raw Features**
 | Feature | Type | Description | Example |
@@ -137,11 +144,11 @@ unzip annotations_trainval2017.zip
 - **Preprocessing**: Images resized to 224×224, normalized
 - **Alternative**: Vision Transformer (ViT) features
 
-#### Text Features (768 dimensions)
-- **Method**: BERT/RoBERTa sentence embeddings
+#### Text Features (2000 dimensions)
+- **Method**: TF-IDF Vectorization
 - **Source**: Caption text
-- **Preprocessing**: Tokenization, lowercasing, special token handling
-- **Alternative**: TF-IDF features (5000 dimensions)
+- **Preprocessing**: Lowercasing, stopword removal, special character cleaning
+- **Features**: Top 2000 most important n-grams (1-gram and 2-gram)
 
 #### Metadata Features (8 dimensions)
 - `image_width`: Original image width
@@ -161,7 +168,10 @@ unzip annotations_trainval2017.zip
 ### 📊 **Dataset Statistics**
 - **Training Images**: 118,287
 - **Validation Images**: 5,000  
-- **Total Captions**: 591,435 (5 per image)
+- **Total Captions**: 616,767 (raw data)
+- **Current Processed**: 1,600 samples
+- **Train Split**: 1,280 samples (80%)
+- **Test Split**: 320 samples (20%)
 - **Average Caption Length**: 10.5 words
 - **Vocabulary Size**: ~27,000 unique words
 - **Image Resolution**: Variable (resized to 224×224 for processing)
@@ -352,8 +362,11 @@ tar -xf yelp_dataset.tar
 4. **Geographic Data**: Location coordinates and neighborhood context
 
 ### 📊 **Dataset Statistics**
-- **Businesses**: 150,346
-- **Reviews**: 6.9 million
+- **Businesses**: 150,346 (raw data)
+- **Reviews**: 6,990,280 (raw data)
+- **Current Processed**: 51,703 samples
+- **Train Split**: 41,362 samples (80%)
+- **Test Split**: 10,341 samples (20%)
 - **Photos**: 200,100
 - **Users**: 1.98 million
 - **Cities**: 1,174 (across 8 countries)
@@ -370,12 +383,12 @@ tar -xf yelp_dataset.tar
 | **Task** | Rating Prediction | Image-Text Retrieval | Medical Diagnosis | Rating/Category Prediction |
 | **Label Type** | Ordinal (1-5) | Text Captions | Multi-label (14) | Ordinal + Multi-label |
 | **Text Source** | Reviews | Captions | Pathology Labels | Reviews |
-| **Text Features** | 75-1000 | 768 (BERT) | 512 (TF-IDF) | 1000 (TF-IDF) |
+| **Text Features** | 1000 (TF-IDF) | 2000 (TF-IDF) | 512 (TF-IDF) | 1000 (TF-IDF) |
 | **Image Type** | Product Photos | Natural Scenes | Medical X-rays | Business Photos |
 | **Image Features** | 2048 (ResNet) | 2048 (ResNet) | 2048 (DenseNet) | 2048 (ResNet) |
-| **Metadata** | 10 features | 8 features | 10 features | 15 features |
-| **Train Samples** | ~100K+ | 118K images | 112K images | 150K businesses |
-| **Modalities** | Text + Image + Meta | Image + Text + Meta | Image + Labels + Meta | Text + Image + Meta |
+| **Metadata** | 14 features | 8 features | 10 features | 15 features |
+| **Train Samples** | 160K | 1,280 | 112K images | 41K businesses |
+| **Modalities** | Text + Meta | Image + Text + Meta | Image + Labels + Meta | Text + Image + Meta |
 | **Complexity** | Medium | High | High | High |
 
 ---
@@ -462,10 +475,10 @@ tar -xf yelp_dataset.tar
 - ✅ Download Yelp Open Dataset
 
 ### **Phase 2: Preprocessing Pipelines (Week 2-3)**
-- 🔧 Implement Amazon Reviews preprocessor
-- 🔧 Implement COCO Captions preprocessor
-- 🔧 Implement ChestX-ray14 preprocessor
-- 🔧 Implement Yelp Dataset preprocessor
+- ✅ Implement Amazon Reviews preprocessor
+- ✅ Implement COCO Captions preprocessor
+- 🔧 Implement ChestX-ray14 preprocessor (Not Active)
+- ✅ Implement Yelp Dataset preprocessor
 
 ### **Phase 3: Benchmarking Framework (Week 4)**
 - 📊 Unified evaluation framework
@@ -482,5 +495,50 @@ tar -xf yelp_dataset.tar
 ---
 
 **Generated:** August 4, 2025  
-**Status:** ✅ 4-DATASET BENCHMARKING PORTFOLIO COMPLETE  
-**Next Steps:** Begin data acquisition and preprocessing pipeline implementation
+**Last Updated:** August 18, 2024
+**Status:** ✅ 3-DATASET BENCHMARKING PORTFOLIO COMPLETE  
+**Next Steps:** Run full data preprocessing to convert all raw data to processed format
+
+---
+
+## 🔧 **Preprocessing Scripts**
+
+### **Available Scripts**
+All preprocessing scripts are located in `Benchmarking/Preprocessing/`:
+
+- **`AmazonReviewsPreProcess.py`**: Processes 1.69M Amazon reviews
+- **`CocoCaptionsPreProcess.py`**: Processes 616K COCO captions + images  
+- **`YelpPreProcess.py`**: Processes 150K Yelp businesses + reviews
+- **`run_all_preprocessing.py`**: Master script to run all preprocessing
+
+### **Usage**
+```bash
+# Run all preprocessing
+cd Benchmarking/Preprocessing
+python3 run_all_preprocessing.py
+
+# Run individual datasets
+python3 AmazonReviewsPreProcess.py
+python3 CocoCaptionsPreProcess.py
+python3 YelpPreProcess.py
+```
+
+### **Output Structure**
+Each script creates:
+```
+Benchmarking/ProcessedData/[DatasetName]/
+├── train/
+│   ├── text_features.npy
+│   ├── image_features.npy (if applicable)
+│   ├── metadata_features.npy
+│   └── labels.npy
+├── test/
+├── preprocessing_components/
+└── mainmodel_data.npy
+```
+
+### **Processing Time Estimates**
+- **AmazonReviews**: 30-60 minutes (text + metadata only)
+- **CocoCaptions**: 2-4 hours (text + images + metadata)
+- **YelpOpen**: 4-8 hours (text + images + metadata)
+- **Total**: 6-12 hours (recommended: run overnight)
