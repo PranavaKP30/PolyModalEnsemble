@@ -68,3 +68,6 @@ Benchmarking/ProcessedData/YelpOpen/
 ProcessedData/AmazonReviews/
 ProcessedData/CocoCaptions/
 ProcessedData/YelpOpen/
+
+# Old processed data backup folder
+Benchmarking/ProcessedData(Old)/

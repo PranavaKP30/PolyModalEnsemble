@@ -3,7 +3,7 @@
 ## Overview
 This document provides comprehensive information about all preprocessed datasets ready for multimodal ensemble learning experimentation. Each dataset has been transformed from raw data into machine learning-ready features using dedicated preprocessing pipelines.
 
-**⚠️ NOTE: Current data reflects 10-sample test runs. Full dataset conversion pending.**
+**✅ NOTE: Full dataset conversion completed successfully. All raw data has been converted to processed format.**
 
 **Datasets Available:**
 - [Amazon Reviews](#amazon-reviews---processed-data) - E-commerce rating prediction
@@ -55,25 +55,25 @@ PreprocessedData/AmazonReviews/
 ### **Dataset Characteristics**
 - **Task Type**: Regression (rating prediction)
 - **Label Range**: 1.0 - 5.0 stars (Amazon rating scale)
-- **Train Samples**: 8 reviews (test run)
-- **Test Samples**: 2 reviews (test run)
+- **Train Samples**: 1,351,351 reviews (80% of full dataset)
+- **Test Samples**: 337,837 reviews (20% of full dataset)
 - **Split Ratio**: 80% / 20% (stratified by rating)
 - **Domain**: E-commerce product reviews (Electronics category)
 
 ### **Multimodal Feature Structure**
-- **Text Modality**: 65 TF-IDF features from review text + summary
+- **Text Modality**: 1,000 TF-IDF features from review text + summary
 - **Metadata Modality**: 14 structured features (price, votes, statistics, derived features)
 - **Image Modality**: ❌ NOT INCLUDED (no image features in current version)
-- **Total Features**: 79 multimodal features per sample
+- **Total Features**: 1,014 multimodal features per sample
 
 ---
 
 ## 🔤 **Text Features Specification**
 
 ### **File Details**
-- **Training**: `train/text_features.npy` (6.1MB)
-- **Testing**: `test/text_features.npy` (1.5MB)
-- **Shape**: (800, 1000) train, (200, 1000) test
+- **Training**: `train/text_features.npy` (5.4GB)
+- **Testing**: `test/text_features.npy` (1.4GB)
+- **Shape**: (1,351,351, 1000) train, (337,837, 1000) test
 - **Data Type**: Float32 (sparse TF-IDF values)
 
 ### **Feature Engineering**
@@ -104,12 +104,12 @@ PreprocessedData/AmazonReviews/
 ## 📋 **Metadata Features Specification**
 
 ### **File Details**
-- **Training**: `train/metadata_features.npy` (75.1KB)
-- **Testing**: `test/metadata_features.npy` (18.9KB)
-- **Shape**: (800, 12) train, (200, 12) test
+- **Training**: `train/metadata_features.npy` (75.1MB)
+- **Testing**: `test/metadata_features.npy` (18.9MB)
+- **Shape**: (1,351,351, 14) train, (337,837, 14) test
 - **Data Type**: Float32 (scaled numerical features)
 
-### **Feature Composition (12 dimensions)**
+### **Feature Composition (14 dimensions)**
 
 #### **Product Information (3 features)**
 1. **`price`**: Product price (log-scaled, median imputed)
@@ -179,9 +179,9 @@ PreprocessedData/AmazonReviews/
 ## 🎯 **Labels Specification**
 
 ### **File Details**
-- **Training**: `train/labels.npy` (6.4KB)
-- **Testing**: `test/labels.npy` (1.7KB)
-- **Shape**: (800,) train, (200,) test
+- **Training**: `train/labels.npy` (5.4MB)
+- **Testing**: `test/labels.npy` (1.4MB)
+- **Shape**: (1,351,351,) train, (337,837,) test
 - **Data Type**: Float32 (regression target)
 
 ### **Label Characteristics**
@@ -299,18 +299,18 @@ loader.add_labels_split(
 ## 💾 **Storage & Performance**
 
 ### **File Sizes & Storage**
-- **Total Dataset Size**: 203.0MB
-- **Largest Component**: mainmodel_data.npy (101.5MB)
-- **Image Features**: 93.8MB (train: 75.0MB + test: 18.8MB)
-- **Text Features**: 7.6MB (train: 6.1MB + test: 1.5MB)
-- **Metadata Features**: 94.0KB (train: 75.1KB + test: 18.9KB)
-- **Labels**: 8.1KB (train: 6.4KB + test: 1.7KB)
+- **Total Dataset Size**: 6.8GB
+- **Largest Component**: text_features (6.8GB total)
+- **Text Features**: 6.8GB (train: 5.4GB + test: 1.4GB)
+- **Metadata Features**: 94.0MB (train: 75.1MB + test: 18.9MB)
+- **Labels**: 6.8MB (train: 5.4MB + test: 1.4MB)
+- **Image Features**: ❌ NOT INCLUDED (no image features in current version)
 - **Preprocessing Components**: 37.7KB
 
 ### **Memory Requirements**
-- **Loading Full Dataset**: ~500MB RAM (with overhead)
-- **MainModel Format**: ~300MB RAM (optimized structure)
-- **Individual Modalities**: Text (~30MB), Metadata (~1MB), Images (~300MB)
+- **Loading Full Dataset**: ~7GB RAM (with overhead)
+- **MainModel Format**: ~7GB RAM (optimized structure)
+- **Individual Modalities**: Text (~7GB), Metadata (~100MB), Images (~0MB)
 - **Batch Processing**: Recommended for large-scale experiments
 
 ### **Performance Characteristics**
@@ -366,7 +366,7 @@ loader.add_labels_split(
 
 ---
 
-**Generated:** August 18, 2025  
+**Generated:** August 19, 2025  
 **Implementation**: AmazonReviewsPreProcess.py  
 **Dataset Source**: Stanford SNAP Amazon Product Reviews  
 **Status**: ✅ AMAZON REVIEWS PREPROCESSED DATA READY  
@@ -414,27 +414,27 @@ PreprocessedData/COCOCaptions/
 ## 📊 **Data Overview**
 
 ### **Dataset Characteristics**
-- **Task Type**: Retrieval (image-text similarity scoring)
-- **Label Range**: 1.0 (positive image-caption pairs)
-- **Train Samples**: 800 image-caption pairs
-- **Test Samples**: 200 image-caption pairs
+- **Task Type**: Binary classification (image-caption matching)
+- **Label Range**: 0.0, 1.0 (binary labels for matching task)
+- **Train Samples**: 493,413 image-caption pairs (80% of full dataset)
+- **Test Samples**: 123,354 image-caption pairs (20% of full dataset)
 - **Split Ratio**: 80% / 20% (random split)
 - **Domain**: Natural images with human-generated captions
 
 ### **Multimodal Feature Structure**
-- **Text Modality**: 1,101 TF-IDF features from human-written captions
+- **Text Modality**: 2,000 TF-IDF features from human-written captions
 - **Image Modality**: 2,048 ResNet-50 CNN features from natural images
 - **Metadata Modality**: 8 structured features (image dimensions, caption statistics)
-- **Total Features**: 3,157 multimodal features per sample
+- **Total Features**: 4,056 multimodal features per sample
 
 ---
 
 ## 🔤 **Text Features Specification**
 
 ### **File Details**
-- **Training**: `train/text_features.npy` (8.6MB)
-- **Testing**: `test/text_features.npy` (2.2MB)
-- **Shape**: (800, 1101) train, (200, 1101) test
+- **Training**: `train/text_features.npy` (3.9GB)
+- **Testing**: `test/text_features.npy` (1.0GB)
+- **Shape**: (493,413, 2000) train, (123,354, 2000) test
 - **Data Type**: Float32 (sparse TF-IDF values)
 
 ### **Feature Engineering**
@@ -472,9 +472,9 @@ PreprocessedData/COCOCaptions/
 ## 🖼️ **Image Features Specification**
 
 ### **File Details**
-- **Training**: `train/image_features.npy` (6.4MB)
-- **Testing**: `test/image_features.npy` (1.6MB)
-- **Shape**: (800, 2048) train, (200, 2048) test
+- **Training**: `train/image_features.npy` (4.0GB)
+- **Testing**: `test/image_features.npy` (1.0GB)
+- **Shape**: (493,413, 2048) train, (123,354, 2048) test
 - **Data Type**: Float32 (CNN activation values)
 
 ### **CNN Feature Extraction**
@@ -551,10 +551,11 @@ PreprocessedData/COCOCaptions/
 - **Data Type**: Float32 (retrieval labels)
 
 ### **Label Characteristics**
-- **Task**: Image-text retrieval (similarity scoring)
-- **Value**: 1.0 for all samples (positive image-caption pairs)
-- **Interpretation**: Correct image-caption matches from COCO dataset
-- **Purpose**: Binary retrieval task (positive pairs vs negative pairs)
+- **Task**: Binary classification (image-caption matching)
+- **Values**: 0.0 or 1.0 (binary labels for matching task)
+- **Distribution**: 50% positive (1.0), 50% negative (0.0) pairs
+- **Interpretation**: Real image-caption pairs are positive, some mismatched for classification task
+- **Purpose**: Binary classification task (real vs mismatched pairs)
 
 ### **Retrieval Task Setup**
 - **Positive Pairs**: Original COCO image-caption associations (label = 1.0)
@@ -1207,8 +1208,8 @@ PreprocessedData/Yelp/
 ### **Dataset Characteristics**
 - **Task Type**: Regression (business rating prediction)
 - **Label Range**: 1.0 - 5.0 stars (Yelp rating scale)
-- **Train Samples**: 800 businesses
-- **Test Samples**: 200 businesses
+- **Train Samples**: 120,276 businesses (80% of full dataset)
+- **Test Samples**: 30,070 businesses (20% of full dataset)
 - **Split Ratio**: 80% / 20% (random split)
 - **Domain**: Local business reviews and recommendations
 
@@ -1223,9 +1224,9 @@ PreprocessedData/Yelp/
 ## 🔤 **Text Features Specification**
 
 ### **File Details**
-- **Training**: `train/text_features.npy` (6.1MB)
-- **Testing**: `test/text_features.npy` (1.5MB)
-- **Shape**: (800, 1000) train, (200, 1000) test
+- **Training**: `train/text_features.npy` (480MB)
+- **Testing**: `test/text_features.npy` (120MB)
+- **Shape**: (120,276, 1000) train, (30,070, 1000) test
 - **Data Type**: Float32 (sparse TF-IDF values)
 
 ### **Feature Engineering**
@@ -1257,9 +1258,9 @@ PreprocessedData/Yelp/
 ## 🖼️ **Image Features Specification**
 
 ### **File Details**
-- **Training**: `train/image_features.npy` (12.5MB)
-- **Testing**: `test/image_features.npy` (3.1MB)
-- **Shape**: (800, 2048) train, (200, 2048) test
+- **Training**: `train/image_features.npy` (960MB)
+- **Testing**: `test/image_features.npy` (240MB)
+- **Shape**: (120,276, 2048) train, (30,070, 2048) test
 - **Data Type**: Float32 (CNN activation values)
 
 ### **Business Photo Processing**
