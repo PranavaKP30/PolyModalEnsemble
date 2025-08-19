@@ -63,3 +63,8 @@ Benchmarking/ProcessedData/ChestXRay(NotActive)/
 Benchmarking/ProcessedData/ChestXRay14(NotActive)/
 Benchmarking/ProcessedData/CocoCaptions/
 Benchmarking/ProcessedData/YelpOpen/
+
+# ProcessedData folders (alternative paths)
+ProcessedData/AmazonReviews/
+ProcessedData/CocoCaptions/
+ProcessedData/YelpOpen/
