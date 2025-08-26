@@ -78,19 +78,64 @@ class EnsemblePredictor:
         self.device = torch.device("cuda" if torch.cuda.is_available() and device in ["auto", "cuda"] else "cpu")
         self.trained_learners = []
         self.learner_metadata = []
+        self.bag_configs = []  # Store bag configurations
         self.transformer_meta_learner = None
         self.confidence_calibrator = None
 
-    def add_trained_learner(self, learner: Any, training_metrics: Dict[str, float], modalities: List[str], pattern: str):
+    def add_trained_learner(self, learner: Any, training_metrics: Dict[str, float], modalities: List[str], pattern: str, bag_config: Any = None):
+        """
+        Add a trained learner with its bag configuration for exact data reconstruction during prediction.
+        
+        Args:
+            learner: The trained learner
+            training_metrics: Training performance metrics
+            modalities: List of modalities used by this learner
+            pattern: Modality pattern string
+            bag_config: BagConfig object containing data indices, modality mask, feature mask, etc.
+        """
         self.trained_learners.append(learner)
         self.learner_metadata.append({
             'metrics': training_metrics,
             'modalities': modalities,
             'pattern': pattern
         })
+        self.bag_configs.append(bag_config)
 
     def setup_transformer_fusion(self, input_dim: int, num_classes: int):
         self.transformer_meta_learner = TransformerMetaLearner(input_dim, num_classes=num_classes, task_type=self.task_type).to(self.device)
+
+    def _reconstruct_bag_data(self, bag_config: Any, full_data: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        """
+        Reconstruct bag data using the exact same configuration used during training.
+        
+        Args:
+            bag_config: BagConfig object from training
+            full_data: Full test data dictionary
+            
+        Returns:
+            Bag data dictionary with exact same structure as training
+        """
+        if bag_config is None:
+            # Fallback to original data if no bag config
+            return full_data
+        
+        bag_data = {}
+        
+        # Apply modality mask (which modalities are active)
+        for modality_name, is_active in bag_config.modality_mask.items():
+            if is_active and modality_name in full_data:
+                modality_data = full_data[modality_name]
+                
+                # Apply feature mask (which features are selected)
+                if hasattr(bag_config, 'feature_mask') and modality_name in bag_config.feature_mask:
+                    feature_mask = bag_config.feature_mask[modality_name]
+                    if feature_mask is not None and len(feature_mask) == modality_data.shape[1]:
+                        # Select only the features that were used during training
+                        modality_data = modality_data[:, feature_mask]
+                
+                bag_data[modality_name] = modality_data
+        
+        return bag_data
 
     def predict(self, data: Dict[str, np.ndarray], return_uncertainty: bool = True) -> PredictionResult:
         """
@@ -127,28 +172,32 @@ class EnsemblePredictor:
         if self.task_type != "classification":
             raise ValueError("predict_proba() is only available for classification tasks")
         
-        # Get individual learner probabilities
+        # Get individual learner probabilities using bag configurations
         all_probas = []
         n_samples = next(iter(data.values())).shape[0] if data else 0
         
-        for learner in self.trained_learners:
+        for i, learner in enumerate(self.trained_learners):
+            # Reconstruct bag data for this learner
+            bag_config = self.bag_configs[i] if i < len(self.bag_configs) else None
+            bag_data = self._reconstruct_bag_data(bag_config, data)
+            
             if hasattr(learner, 'predict_proba'):
                 try:
                     # Try dict input first
                     if hasattr(learner, 'predict_proba') and 'X' in learner.predict_proba.__code__.co_varnames:
                         try:
-                            proba = learner.predict_proba(data)
+                            proba = learner.predict_proba(bag_data)
                             all_probas.append(proba)
                             continue
                         except Exception:
                             pass
                     
                     # Fallback to array input
-                    proba = learner.predict_proba(np.column_stack([data[k] for k in sorted(data)]))
+                    proba = learner.predict_proba(np.column_stack([bag_data[k] for k in sorted(bag_data)]))
                     all_probas.append(proba)
                 except Exception:
                     # If no predict_proba, create one-hot from predictions
-                    pred = learner.predict(np.column_stack([data[k] for k in sorted(data)]))
+                    pred = learner.predict(np.column_stack([bag_data[k] for k in sorted(bag_data)]))
                     n_classes = max(pred) + 1
                     proba = np.zeros((len(pred), n_classes))
                     proba[np.arange(len(pred)), pred] = 1.0
@@ -196,13 +245,17 @@ class EnsemblePredictor:
         paired_sorted = sorted(paired, key=lambda x: learner_sort_key(x[0]))
         sorted_learners, sorted_metadata = zip(*paired_sorted) if paired_sorted else ([], [])
 
-        for learner in sorted_learners:
+        for i, learner in enumerate(sorted_learners):
+            # Reconstruct bag data for this learner
+            bag_config = self.bag_configs[i] if i < len(self.bag_configs) else None
+            bag_data = self._reconstruct_bag_data(bag_config, data)
+            
             # Torch model
             if hasattr(learner, 'forward') or hasattr(learner, 'forward_fusion'):
                 learner.eval()
                 with torch.no_grad():
                     device = next(learner.parameters()).device if hasattr(learner, 'parameters') else torch.device('cpu')
-                    torch_data = {k: torch.tensor(v, dtype=torch.float32, device=device) for k, v in data.items()}
+                    torch_data = {k: torch.tensor(v, dtype=torch.float32, device=device) for k, v in bag_data.items()}
                     if hasattr(learner, 'forward_fusion'):
                         out = learner.forward_fusion(torch_data)
                     else:
@@ -225,45 +278,45 @@ class EnsemblePredictor:
             elif hasattr(learner, 'predict_proba') and 'X' in learner.predict_proba.__code__.co_varnames:
                 try:
                     if self.task_type == "classification":
-                        proba = learner.predict_proba(data)
+                        proba = learner.predict_proba(bag_data)
                         pred = np.argmax(proba, axis=1)
                         conf = np.max(proba, axis=1)
                     else:
                         # Regression: no predict_proba, use predict
-                        pred = learner.predict(data)
+                        pred = learner.predict(bag_data)
                         conf = np.ones_like(pred, dtype=float)
                     predictions.append(pred)
                     confidences.append(conf)
                 except Exception:
                     # fallback to array if fails
                     if self.task_type == "classification" and hasattr(learner, 'predict_proba'):
-                        proba = learner.predict_proba(np.column_stack([data[k] for k in sorted(data)]))
+                        proba = learner.predict_proba(np.column_stack([bag_data[k] for k in sorted(bag_data)]))
                         pred = np.argmax(proba, axis=1)
                         conf = np.max(proba, axis=1)
                     else:
                         # Regression or no predict_proba
-                        pred = learner.predict(np.column_stack([data[k] for k in sorted(data)]))
+                        pred = learner.predict(np.column_stack([bag_data[k] for k in sorted(bag_data)]))
                         conf = np.ones_like(pred, dtype=float)
                     predictions.append(pred)
                     confidences.append(conf)
             # Sklearn model: expects array input
             elif hasattr(learner, 'predict_proba') and self.task_type == "classification":
-                proba = learner.predict_proba(np.column_stack([data[k] for k in sorted(data)]))
+                proba = learner.predict_proba(np.column_stack([bag_data[k] for k in sorted(bag_data)]))
                 pred = np.argmax(proba, axis=1)
                 conf = np.max(proba, axis=1)
                 predictions.append(pred)
                 confidences.append(conf)
             elif hasattr(learner, 'predict') and 'X' in learner.predict.__code__.co_varnames:
                 try:
-                    pred = learner.predict(data)
+                    pred = learner.predict(bag_data)
                     predictions.append(pred)
                     confidences.append(np.ones_like(pred, dtype=float))
                 except Exception:
-                    pred = learner.predict(np.column_stack([data[k] for k in sorted(data)]))
+                    pred = learner.predict(np.column_stack([bag_data[k] for k in sorted(bag_data)]))
                     predictions.append(pred)
                     confidences.append(np.ones_like(pred, dtype=float))
             elif hasattr(learner, 'predict'):
-                pred = learner.predict(np.column_stack([data[k] for k in sorted(data)]))
+                pred = learner.predict(np.column_stack([bag_data[k] for k in sorted(bag_data)]))
                 predictions.append(pred)
                 confidences.append(np.ones_like(pred, dtype=float))
         predictions = np.array(predictions)
@@ -285,12 +338,30 @@ class EnsemblePredictor:
             elif self.aggregation_strategy == AggregationStrategy.WEIGHTED_VOTE:
                 weights = np.array([m['metrics'].get('accuracy', 0.5) for m in sorted_metadata])
                 final_pred = self._weighted_vote(predictions, weights)
+            elif self.aggregation_strategy == AggregationStrategy.CONFIDENCE_WEIGHTED:
+                # Use confidence scores as weights
+                weights = np.mean(confidences, axis=1) if confidences.size > 0 else np.ones(len(sorted_metadata))
+                final_pred = self._weighted_vote(predictions, weights)
+            elif self.aggregation_strategy == AggregationStrategy.STACKING:
+                # Simple stacking: average predictions
+                final_pred = np.mean(predictions, axis=0).astype(int)
+            elif self.aggregation_strategy == AggregationStrategy.DYNAMIC_WEIGHTING:
+                # Dynamic weighting based on recent performance
+                weights = np.array([m['metrics'].get('accuracy', 0.5) for m in sorted_metadata])
+                weights = weights / np.sum(weights)  # Normalize
+                final_pred = self._weighted_vote(predictions, weights)
+            elif self.aggregation_strategy == AggregationStrategy.UNCERTAINTY_WEIGHTED:
+                # Weight by inverse uncertainty (higher confidence = higher weight)
+                weights = np.mean(confidences, axis=1) if confidences.size > 0 else np.ones(len(sorted_metadata))
+                weights = weights / np.sum(weights)  # Normalize
+                final_pred = self._weighted_vote(predictions, weights)
             elif self.aggregation_strategy == AggregationStrategy.TRANSFORMER_FUSION and self.transformer_meta_learner:
                 x = torch.tensor(predictions, dtype=torch.float32).unsqueeze(-1).to(self.device)
                 logits, attn_weights = self.transformer_meta_learner(x)
                 final_pred = torch.argmax(logits, dim=-1).cpu().numpy()
             else:
-                final_pred = predictions[0] if len(predictions) > 0 else np.array([])
+                # Default to majority vote
+                final_pred = self._majority_vote(predictions) if len(predictions) > 0 else np.array([])
         # Confidence
         avg_conf = np.mean(confidences, axis=0) if confidences.size > 0 else None
         # Uncertainty
@@ -303,17 +374,32 @@ class EnsemblePredictor:
                     uncertainty = -np.sum(probs * np.log(probs + 1e-10))
                 else:
                     uncertainty = None
+            elif self.uncertainty_method == UncertaintyMethod.VARIANCE:
+                # Variance of predictions across learners
+                if predictions.shape[0] > 1:
+                    uncertainty = np.var(predictions, axis=0)
+                else:
+                    uncertainty = None
+            elif self.uncertainty_method == UncertaintyMethod.MONTE_CARLO:
+                # Monte Carlo uncertainty (placeholder)
+                uncertainty = np.std(predictions, axis=0) if predictions.shape[0] > 1 else None
             elif self.uncertainty_method == UncertaintyMethod.ENSEMBLE_DISAGREEMENT:
                 # Fraction of disagreeing learners
-                mode = np.apply_along_axis(lambda x: np.bincount(x).argmax(), 0, predictions)
-                disagreement = 1.0 - np.mean(predictions == mode, axis=0)
-                uncertainty = disagreement
+                if predictions.shape[0] > 1:
+                    mode = np.apply_along_axis(lambda x: np.bincount(x).argmax(), 0, predictions)
+                    disagreement = 1.0 - np.mean(predictions == mode, axis=0)
+                    uncertainty = disagreement
+                else:
+                    uncertainty = None
+            elif self.uncertainty_method == UncertaintyMethod.ATTENTION_BASED:
+                # Attention-based uncertainty (placeholder)
+                uncertainty = np.std(predictions, axis=0) if predictions.shape[0] > 1 else None
         # Modality importance (simple uniform for now)
         modality_importance = {mod: 1.0/len(data) for mod in data} if data else None
         # Metadata
         meta = {
             'n_learners': len(self.trained_learners),
-            'aggregation_strategy': self.aggregation_strategy.value,
+            'aggregation_strategy': self.aggregation_strategy.value if hasattr(self.aggregation_strategy, 'value') else str(self.aggregation_strategy),
             'inference_time': 0.0
         }
         return PredictionResult(

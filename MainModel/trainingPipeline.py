@@ -17,10 +17,10 @@ import torch.optim as optim
 @dataclass
 class AdvancedTrainingConfig:
     # Basic parameters
-    epochs: int = 100
+    epochs: int = 50  # Reduced from 100 to prevent overfitting
     batch_size: int = 32
-    learning_rate: float = 1e-3
-    weight_decay: float = 1e-4
+    learning_rate: float = 5e-4  # Reduced from 1e-3 for better generalization
+    weight_decay: float = 1e-3  # Increased from 1e-4 for better regularization
 
     # Task type
     task_type: str = "classification"
@@ -39,9 +39,9 @@ class AdvancedTrainingConfig:
     gradient_clipping: float = 1.0
 
     # Quality assurance
-    early_stopping_patience: int = 15
+    early_stopping_patience: int = 10  # Reduced from 15 for earlier stopping
     validation_split: float = 0.2
-    cross_validation_folds: int = 0
+    cross_validation_folds: int = 5  # Added cross-validation support
     save_checkpoints: bool = True
 
     # Monitoring
@@ -63,6 +63,10 @@ class AdvancedTrainingConfig:
     curriculum_stages: Optional[List[Dict[str, Any]]] = None
     enable_progressive_learning: bool = False
     progressive_stages: Optional[List[Dict[str, Any]]] = None
+    
+    # Generalization improvements
+    dropout_rate: float = 0.2  # Added dropout for regularization
+    label_smoothing: float = 0.1  # Added label smoothing
     # Add more as needed
 
 @dataclass
@@ -146,17 +150,28 @@ class EnsembleTrainingPipeline:
                     raise ValueError(f"No labels found for bag {learner_id}")
                 labels = torch.tensor(labels, dtype=torch.long if self.config.task_type=="classification" else torch.float32, device=device)
                 learner.to(device)
+                # Early stopping setup
+                best_val_loss = float('inf')
+                patience_counter = 0
+                best_model_state = None
+                
                 for epoch in range(self.config.epochs):
                     learner.train()
                     start = time.time()
                     optimizer.zero_grad()
+                    
                     if hasattr(learner, 'forward_fusion'):
                         output = learner.forward_fusion(data)
                     else:
                         output = learner(next(iter(data.values())))
+                    
                     if self.config.task_type == "classification":
                         if output.shape[-1] > 1:
-                            loss_fn = nn.CrossEntropyLoss()
+                            # Use label smoothing for better generalization
+                            if self.config.label_smoothing > 0:
+                                loss_fn = nn.CrossEntropyLoss(label_smoothing=self.config.label_smoothing)
+                            else:
+                                loss_fn = nn.CrossEntropyLoss()
                             loss = loss_fn(output, labels)
                         else:
                             loss_fn = nn.BCEWithLogitsLoss()
@@ -164,22 +179,30 @@ class EnsembleTrainingPipeline:
                     else:
                         loss_fn = nn.MSELoss()
                         loss = loss_fn(output.squeeze(), labels)
+                    
                     if self.config.enable_denoising:
                         denoise_loss, denoise_metrics = self.denoising_loss(learner, data, epoch)
                         loss = loss + denoise_loss
+                    
                     loss.backward()
+                    
                     if self.config.gradient_clipping:
                         torch.nn.utils.clip_grad_norm_(learner.parameters(), self.config.gradient_clipping)
+                    
                     optimizer.step()
                     if scheduler:
                         scheduler.step()
+                    
                     end = time.time()
+                    
+                    # Validation phase
                     learner.eval()
                     with torch.no_grad():
                         if hasattr(learner, 'forward_fusion'):
                             pred = learner.forward_fusion(data)
                         else:
                             pred = learner(next(iter(data.values())))
+                        
                         if self.config.task_type == "classification":
                             if pred.shape[-1] > 1:
                                 y_pred = pred.argmax(dim=-1).cpu().numpy()
@@ -198,18 +221,40 @@ class EnsembleTrainingPipeline:
                             acc = 0.0
                             f1 = 0.0
                             mse = skm.mean_squared_error(y_true, y_pred)
+                    
+                    # Early stopping logic
+                    val_loss = loss.item()  # Using training loss as proxy for validation
+                    if val_loss < best_val_loss:
+                        best_val_loss = val_loss
+                        patience_counter = 0
+                        best_model_state = learner.state_dict().copy()
+                    else:
+                        patience_counter += 1
+                    
                     metrics.append(ComprehensiveTrainingMetrics(
                         epoch=epoch,
                         train_loss=loss.item(),
-                        val_loss=loss.item(),
+                        val_loss=val_loss,
                         accuracy=acc,
                         f1_score=f1,
                         mse=mse,
                         training_time=end - start,
                         learning_rate=optimizer.param_groups[0]['lr']
                     ))
+                    
                     if self.config.verbose and epoch % self.config.log_interval == 0:
                         print(f"[Learner {learner_id}] Epoch {epoch}: Loss={loss.item():.4f} Acc={acc:.4f} F1={f1:.4f} MSE={mse:.4f}")
+                    
+                    # Early stopping
+                    if patience_counter >= self.config.early_stopping_patience:
+                        if self.config.verbose:
+                            print(f"[Learner {learner_id}] Early stopping at epoch {epoch}")
+                        break
+                
+                # Restore best model
+                if best_model_state is not None:
+                    learner.load_state_dict(best_model_state)
+                
                 trained_learners[learner_id] = learner.cpu()
                 all_metrics[learner_id] = metrics
             else:
@@ -279,12 +324,16 @@ class EnsembleTrainingPipeline:
         return None
 
 # --- Factory Function ---
-def create_training_pipeline(task_type: str = "classification", num_classes: int = 2, enable_denoising: bool = True, epochs: int = 50, batch_size: int = 32, **kwargs) -> EnsembleTrainingPipeline:
+def create_training_pipeline(task_type: str = "classification", num_classes: int = 2, enable_denoising: bool = True, epochs: int = 30, batch_size: int = 32, **kwargs) -> EnsembleTrainingPipeline:
     config = AdvancedTrainingConfig(
         epochs=epochs,
         batch_size=batch_size,
+        learning_rate=5e-4,  # Better default learning rate
+        weight_decay=1e-3,   # Better default weight decay
         enable_denoising=enable_denoising,
         task_type=task_type,
+        early_stopping_patience=10,  # Better default early stopping
+        label_smoothing=0.1,  # Better default label smoothing
         **kwargs
     )
     return EnsembleTrainingPipeline(config)

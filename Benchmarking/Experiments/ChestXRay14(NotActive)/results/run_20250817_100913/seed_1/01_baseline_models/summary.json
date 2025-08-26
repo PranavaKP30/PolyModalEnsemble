@@ -1,7 +1,0 @@
-{
-  "total_models": 23,
-  "successful_models": 24,
-  "failed_models": -1,
-  "best_model": "naive_bayes",
-  "best_f1": 0.14701147492298636
-}

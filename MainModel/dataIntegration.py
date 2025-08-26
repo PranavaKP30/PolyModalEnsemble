@@ -189,24 +189,38 @@ class GenericMultiModalDataLoader:
         for name, arr in self.data.items():
             if not isinstance(arr, np.ndarray) or arr.dtype.kind not in 'fc':
                 continue
+            
+            # Handle NaN values
             if handle_nan == 'drop':
                 mask = ~np.isnan(arr).any(axis=1)
                 arr = arr[mask]
             elif handle_nan == 'fill_mean':
                 means = np.nanmean(arr, axis=0)
                 inds = np.where(np.isnan(arr))
-                arr[inds] = np.take(means, inds[1])
+                if len(inds) == 2:  # 2D array
+                    arr[inds] = np.take(means, inds[1])
+                else:  # 1D array
+                    arr[inds] = means
             elif handle_nan == 'fill_zero':
                 arr = np.nan_to_num(arr, nan=0.0)
+            
+            # Handle Inf values
             if handle_inf == 'drop':
                 mask = ~np.isinf(arr).any(axis=1)
                 arr = arr[mask]
             elif handle_inf == 'fill_max':
+                # Use nanmax to ignore Inf values when computing max
                 maxs = np.nanmax(arr, axis=0)
+                # If maxs still contains Inf, replace with a large finite value
+                maxs = np.where(np.isinf(maxs), 1e6, maxs)
                 inds = np.where(np.isinf(arr))
-                arr[inds] = np.take(maxs, inds[1])
+                if len(inds) == 2:  # 2D array
+                    arr[inds] = np.take(maxs, inds[1])
+                else:  # 1D array
+                    arr[inds] = maxs
             elif handle_inf == 'fill_zero':
                 arr = np.where(np.isinf(arr), 0.0, arr)
+            
             self.data[name] = arr
 
     def get_data_quality_report(self) -> Dict[str, Any]:

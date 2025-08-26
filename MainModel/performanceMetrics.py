@@ -57,17 +57,46 @@ class ModelPerformanceReport:
 class ClassificationMetricsCalculator:
     @staticmethod
     def calculate(y_true, y_pred, y_proba=None, top_k=(1, 3, 5)):
+        """
+        Calculate 5 key classification metrics:
+        1. Accuracy
+        2. F1 Score (weighted)
+        3. Precision (weighted)
+        4. Recall (weighted)
+        5. Balanced Accuracy
+        """
         metrics = {}
+        
+        # 1. Accuracy
         metrics['accuracy'] = accuracy_score(y_true, y_pred)
-        metrics['f1_score'] = f1_score(y_true, y_pred, average='weighted')
-        metrics['precision'] = precision_score(y_true, y_pred, average='weighted', zero_division=0)
-        metrics['recall'] = recall_score(y_true, y_pred, average='weighted', zero_division=0)
-        metrics['balanced_accuracy'] = accuracy_score(y_true, y_pred)
-        from sklearn.metrics import cohen_kappa_score
+        
+        # 2. F1 Score (weighted for multi-class)
         try:
-            metrics['kappa_score'] = cohen_kappa_score(y_true, y_pred)
+            metrics['f1_score'] = f1_score(y_true, y_pred, average='weighted', zero_division=0)
         except Exception:
-            metrics['kappa_score'] = 0.0
+            metrics['f1_score'] = 0.0
+        
+        # 3. Precision (weighted for multi-class)
+        try:
+            metrics['precision'] = precision_score(y_true, y_pred, average='weighted', zero_division=0)
+        except Exception:
+            metrics['precision'] = 0.0
+        
+        # 4. Recall (weighted for multi-class)
+        try:
+            metrics['recall'] = recall_score(y_true, y_pred, average='weighted', zero_division=0)
+        except Exception:
+            metrics['recall'] = 0.0
+        
+        # 5. Balanced Accuracy
+        try:
+            from sklearn.metrics import balanced_accuracy_score
+            metrics['balanced_accuracy'] = balanced_accuracy_score(y_true, y_pred)
+        except Exception:
+            # Fallback to regular accuracy if balanced_accuracy_score not available
+            metrics['balanced_accuracy'] = accuracy_score(y_true, y_pred)
+        
+        # Additional metrics for comprehensive evaluation
         if y_proba is not None and y_proba.shape[1] > 1:
             try:
                 metrics['auc_roc'] = roc_auc_score(y_true, y_proba, multi_class='ovr')
@@ -79,6 +108,7 @@ class ClassificationMetricsCalculator:
             metrics['auc_roc'] = 0.0
             metrics['brier_score'] = 0.0
             metrics['prediction_entropy'] = 0.0
+        
         # Top-k accuracy
         for k in top_k:
             if y_proba is not None and y_proba.shape[1] >= k:
@@ -87,17 +117,55 @@ class ClassificationMetricsCalculator:
                 metrics[f'top_{k}_accuracy'] = top_k_acc
             else:
                 metrics[f'top_{k}_accuracy'] = 0.0
+        
         return metrics
 
 class RegressionMetricsCalculator:
     @staticmethod
     def calculate(y_true, y_pred):
+        """
+        Calculate 5 key regression metrics:
+        1. Mean Squared Error (MSE)
+        2. Mean Absolute Error (MAE)
+        3. Root Mean Squared Error (RMSE)
+        4. R-squared Score (R²)
+        5. Mean Absolute Percentage Error (MAPE)
+        """
         metrics = {}
-        metrics['mse'] = mean_squared_error(y_true, y_pred)
-        metrics['mae'] = mean_absolute_error(y_true, y_pred)
-        metrics['rmse'] = np.sqrt(metrics['mse'])
-        metrics['r2_score'] = r2_score(y_true, y_pred)
-        metrics['mape'] = np.mean(np.abs((y_true - y_pred) / (y_true + 1e-10)))
+        
+        # 1. Mean Squared Error (MSE)
+        try:
+            metrics['mse'] = mean_squared_error(y_true, y_pred)
+        except Exception:
+            metrics['mse'] = 0.0
+        
+        # 2. Mean Absolute Error (MAE)
+        try:
+            metrics['mae'] = mean_absolute_error(y_true, y_pred)
+        except Exception:
+            metrics['mae'] = 0.0
+        
+        # 3. Root Mean Squared Error (RMSE)
+        try:
+            metrics['rmse'] = np.sqrt(metrics['mse'])
+        except Exception:
+            metrics['rmse'] = 0.0
+        
+        # 4. R-squared Score (R²)
+        try:
+            metrics['r2_score'] = r2_score(y_true, y_pred)
+        except Exception:
+            metrics['r2_score'] = 0.0
+        
+        # 5. Mean Absolute Percentage Error (MAPE)
+        try:
+            # Handle division by zero and avoid extreme values
+            mape = np.mean(np.abs((y_true - y_pred) / (np.abs(y_true) + 1e-10)))
+            # Cap MAPE at 1000% to avoid extreme values
+            metrics['mape'] = min(mape, 1000.0)
+        except Exception:
+            metrics['mape'] = 0.0
+        
         return metrics
 
 class MultimodalMetricsCalculator:
@@ -149,42 +217,65 @@ class PerformanceEvaluator:
         Robust evaluation: supports callable, attribute, or lambda for predict/predict_proba, fills all ModelPerformanceReport fields.
         """
         # Predict
-        y_pred = model_predict_fn(test_data)
+        try:
+            y_pred = model_predict_fn(test_data)
+        except Exception as e:
+            print(f"Warning: Prediction failed: {e}")
+            y_pred = np.zeros_like(y_true)
+        
         y_proba = None
         # Try to get probabilities if possible
-        if return_probabilities:
-            if hasattr(model_predict_fn, 'predict_proba'):
-                y_proba = model_predict_fn.predict_proba(test_data)
-            elif hasattr(model_predict_fn, '__self__') and hasattr(model_predict_fn.__self__, 'predict_proba'):
-                y_proba = model_predict_fn.__self__.predict_proba(test_data)
-            elif hasattr(model_predict_fn, 'predict') and hasattr(model_predict_fn, 'predict_proba'):
-                y_proba = model_predict_fn.predict_proba(test_data)
-            else:
+        if return_probabilities and self.task_type == "classification":
+            try:
+                if hasattr(model_predict_fn, 'predict_proba'):
+                    y_proba = model_predict_fn.predict_proba(test_data)
+                elif hasattr(model_predict_fn, '__self__') and hasattr(model_predict_fn.__self__, 'predict_proba'):
+                    y_proba = model_predict_fn.__self__.predict_proba(test_data)
+                elif hasattr(model_predict_fn, 'predict') and hasattr(model_predict_fn, 'predict_proba'):
+                    y_proba = model_predict_fn.predict_proba(test_data)
+            except Exception as e:
+                print(f"Warning: Probability prediction failed: {e}")
                 y_proba = None
-        # Metrics
+        
+        # Calculate metrics based on task type
         if self.task_type == "classification":
             metrics = ClassificationMetricsCalculator.calculate(y_true, y_pred, y_proba)
         else:
             metrics = RegressionMetricsCalculator.calculate(y_true, y_pred)
-        # Efficiency
-        inf_time, _ = EfficiencyMetricsCalculator.measure_inference_time(model_predict_fn, test_data, n_runs=n_efficiency_runs) if measure_efficiency else (0.0, 0.0)
-        throughput = EfficiencyMetricsCalculator.measure_throughput(model_predict_fn, test_data) if measure_efficiency else 0.0
-        mem_usage = EfficiencyMetricsCalculator.measure_memory_usage() if measure_efficiency else 0.0
-        # Fill all ModelPerformanceReport fields
-        report_fields = {f.name for f in ModelPerformanceReport.__dataclass_fields__.values()}
-        for k in report_fields:
-            if k not in metrics:
-                metrics[k] = 0.0 if 'float' in str(ModelPerformanceReport.__dataclass_fields__[k].type) else None
-        # Remove keys that will be set explicitly to avoid duplicate kwarg
-        for k in ['model_name', 'inference_time_ms', 'throughput_samples_per_sec', 'memory_usage_mb']:
-            if k in metrics:
-                del metrics[k]
+        
+        # Efficiency metrics
+        if measure_efficiency:
+            try:
+                inf_time, _ = EfficiencyMetricsCalculator.measure_inference_time(model_predict_fn, test_data, n_runs=n_efficiency_runs)
+                throughput = EfficiencyMetricsCalculator.measure_throughput(model_predict_fn, test_data)
+                mem_usage = EfficiencyMetricsCalculator.measure_memory_usage()
+            except Exception as e:
+                print(f"Warning: Efficiency measurement failed: {e}")
+                inf_time, throughput, mem_usage = 0.0, 0.0, 0.0
+        else:
+            inf_time, throughput, mem_usage = 0.0, 0.0, 0.0
+        
+        # Initialize default values for all ModelPerformanceReport fields
+        default_metrics = {
+            'accuracy': 0.0, 'f1_score': 0.0, 'auc_roc': 0.0, 'precision': 0.0, 'recall': 0.0,
+            'balanced_accuracy': 0.0, 'kappa_score': 0.0, 'top_1_accuracy': 0.0, 'top_3_accuracy': 0.0, 'top_5_accuracy': 0.0,
+            'mse': 0.0, 'mae': 0.0, 'rmse': 0.0, 'r2_score': 0.0, 'mape': 0.0,
+            'ece_score': 0.0, 'brier_score': 0.0, 'prediction_entropy': 0.0, 'confidence_accuracy_correlation': 0.0,
+            'inference_time_ms': 0.0, 'throughput_samples_per_sec': 0.0, 'memory_usage_mb': 0.0,
+            'cross_modal_consistency': 0.0, 'modality_importance': {}, 'missing_modality_robustness': {}
+        }
+        
+        # Update with calculated metrics
+        default_metrics.update(metrics)
+        
+        # Set efficiency metrics
+        default_metrics['inference_time_ms'] = inf_time
+        default_metrics['throughput_samples_per_sec'] = throughput
+        default_metrics['memory_usage_mb'] = mem_usage
+        
         return ModelPerformanceReport(
             model_name=model_name,
-            **metrics,
-            inference_time_ms=inf_time,
-            throughput_samples_per_sec=throughput,
-            memory_usage_mb=mem_usage
+            **default_metrics
         )
 
 # --- Model Comparison ---

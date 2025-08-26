@@ -1,8 +1,0 @@
-ChestX-ray14 Experiment Summary
-========================================
-
-Baseline Models:
-Best Model: knn
-Best F1: 0.366
-
-Main Model:

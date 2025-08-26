@@ -75,7 +75,7 @@ class ModalityDropoutBagger:
         for bag_id in range(self.n_bags):
             # Dropout rate calculation
             progress = bag_id / max(1, self.n_bags - 1)
-            dropout_rate = self._calc_dropout_rate(progress, bag_id)
+            dropout_rate = self._calc_dropout_rate(progress, bag_id, bags)  # Pass current bags
             # Modality mask
             n_modalities = len(modality_names)
             n_drop = int(np.floor(dropout_rate * n_modalities))
@@ -119,7 +119,7 @@ class ModalityDropoutBagger:
         self.bags = bags
         return bags
 
-    def _calc_dropout_rate(self, progress: float, bag_id: int) -> float:
+    def _calc_dropout_rate(self, progress: float, bag_id: int, current_bags: List[BagConfig] = None) -> float:
         if self.dropout_strategy == 'linear':
             return progress * self.max_dropout_rate
         elif self.dropout_strategy == 'exponential':
@@ -127,9 +127,14 @@ class ModalityDropoutBagger:
         elif self.dropout_strategy == 'random':
             return self._rng.uniform(0, self.max_dropout_rate)
         elif self.dropout_strategy == 'adaptive':
-            # Placeholder: simple adaptive logic
-            if hasattr(self, 'bags') and self.bags:
+            # Adaptive logic using current bags
+            if current_bags and len(current_bags) > 0:
+                # Temporarily set bags for diversity calculation
+                original_bags = self.bags
+                self.bags = current_bags
                 current_div = self._estimate_diversity()
+                self.bags = original_bags  # Restore original
+                
                 if current_div < self.diversity_target:
                     return min(self.max_dropout_rate, progress * self.max_dropout_rate + 0.1)
                 else:
