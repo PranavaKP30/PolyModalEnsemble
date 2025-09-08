@@ -67,7 +67,7 @@ class TransformerMetaLearner(nn.Module):
 class EnsemblePredictor:
     def __init__(self,
                  task_type: str = "classification",
-                 aggregation_strategy: Union[str, AggregationStrategy] = "weighted_vote",
+                 aggregation_strategy: Union[str, AggregationStrategy] = "transformer_fusion",
                  uncertainty_method: Union[str, UncertaintyMethod] = "entropy",
                  calibrate_uncertainty: bool = True,
                  device: str = "auto"):
@@ -299,6 +299,17 @@ class EnsemblePredictor:
                         conf = np.ones_like(pred, dtype=float)
                     predictions.append(pred)
                     confidences.append(conf)
+            # ModalityAwareBaseLearnerSelector: expects dictionary input
+            elif hasattr(learner, '__class__') and 'ModalityAwareBaseLearnerSelector' in str(learner.__class__):
+                try:
+                    pred = learner.predict(bag_data)
+                    predictions.append(pred)
+                    confidences.append(np.ones_like(pred, dtype=float))
+                except Exception as e:
+                    # Fallback to array input if dictionary fails
+                    pred = learner.predict(np.column_stack([bag_data[k] for k in sorted(bag_data)]))
+                    predictions.append(pred)
+                    confidences.append(np.ones_like(pred, dtype=float))
             # Sklearn model: expects array input
             elif hasattr(learner, 'predict_proba') and self.task_type == "classification":
                 proba = learner.predict_proba(np.column_stack([bag_data[k] for k in sorted(bag_data)]))

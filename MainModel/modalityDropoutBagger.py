@@ -50,6 +50,7 @@ class ModalityDropoutBagger:
         self.bags: List[BagConfig] = []
         self._rng = np.random.default_rng(random_state)
         self._validate_params()
+        
 
     @classmethod
     def from_data_integration(cls, integrated_data: Dict[str, np.ndarray], modality_configs: List[Any], integration_metadata: Dict[str, Any], n_bags: int = 20, dropout_strategy: str = "adaptive", max_dropout_rate: float = 0.5, **kwargs) -> "ModalityDropoutBagger":
@@ -105,6 +106,20 @@ class ModalityDropoutBagger:
             n_samples = int(self.sample_ratio * dataset_size)
             data_indices = self._rng.choice(np.arange(dataset_size), size=n_samples, replace=True)
             # BagConfig
+            # Calculate diversity score for this bag
+            diversity_score = self._estimate_diversity() if bags else 0.0
+            
+            
+            # Create feature sampling info
+            feature_sampling_info = {}
+            for modality_name, mask in feature_mask.items():
+                if len(mask) > 0:
+                    feature_sampling_info[modality_name] = {
+                        'features_sampled': int(mask.sum()),
+                        'total_features': len(mask),
+                        'sampling_ratio': float(mask.sum()) / len(mask)
+                    }
+            
             bag = BagConfig(
                 bag_id=bag_id,
                 data_indices=data_indices,
@@ -112,6 +127,7 @@ class ModalityDropoutBagger:
                 feature_mask=feature_mask,
                 dropout_rate=dropout_rate,
                 sample_ratio=self.sample_ratio,
+                diversity_score=diversity_score,
                 creation_timestamp=time.strftime('%Y-%m-%d %H:%M:%S'),
                 metadata={}
             )
@@ -157,21 +173,25 @@ class ModalityDropoutBagger:
     def get_bag_data(self, bag_id: int, multimodal_data: Dict[str, np.ndarray], return_metadata: bool = False):
         bag = self.bags[bag_id]
         bag_data = {}
+        
         for name, active in bag.modality_mask.items():
             if active:
-                mask = bag.feature_mask[name]
-                bag_data[name] = multimodal_data[name][bag.data_indices][:, mask]
+                if name in bag.feature_mask:
+                    mask = bag.feature_mask[name]
+                    bag_data[name] = multimodal_data[name][bag.data_indices][:, mask]
+        
         labels = multimodal_data.get('labels')
         if labels is not None:
             bag_data['labels'] = labels[bag.data_indices]
+        
         if return_metadata:
             return bag_data, bag.modality_mask, {
                 'sample_count': len(bag.data_indices),
                 'diversity_score': bag.diversity_score,
                 'dropout_rate': bag.dropout_rate,
-                'feature_sampling_info': {k: {'features_sampled': mask.sum(), 'total_features': len(mask), 'sampling_ratio': mask.sum()/len(mask) if len(mask) else 0.0} for k, mask in bag.feature_mask.items() if len(mask)},
+                'feature_sampling_info': {k: {'features_sampled': int(mask.sum()), 'total_features': len(mask), 'sampling_ratio': float(mask.sum()/len(mask)) if len(mask) else 0.0} for k, mask in bag.feature_mask.items() if len(mask)},
             }
-        return bag_data, bag.modality_mask
+        return bag_data
 
     def get_bag_info(self, bag_id: int) -> Dict[str, Any]:
         bag = self.bags[bag_id]
@@ -220,3 +240,4 @@ class ModalityDropoutBagger:
         import pickle
         with open(filepath, 'rb') as f:
             return pickle.load(f)
+    

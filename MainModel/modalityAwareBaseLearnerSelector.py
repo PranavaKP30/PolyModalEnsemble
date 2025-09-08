@@ -18,6 +18,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import logging
 
+def safe_get_values(X):
+    """Safely get values from X whether it's a dict or numpy array."""
+    if isinstance(X, dict):
+        return list(X.values())
+    else:
+        # X is a numpy array, return as list
+        return [X]
+
 logger = logging.getLogger("base_learner_selection")
 
 # --- LearnerConfig ---
@@ -746,44 +754,44 @@ class FusionLearner(BaseLearnerInterface):
             X_fusion = np.hstack(modality_predictions)
             
             if self.fusion_type == 'attention':
+                # Use XGBoost for attention-like fusion (more sophisticated than MLP)
                 try:
-                    import tensorflow as tf
-                    from tensorflow.keras.models import Sequential
-                    from tensorflow.keras.layers import Dense, Dropout, MultiHeadAttention, GlobalAveragePooling1D
-                    
-                    # Simple attention-like fusion
-                    model = Sequential([
-                        Dense(64, activation='relu', input_shape=(X_fusion.shape[1],)),
-                        Dropout(0.3),
-                        Dense(32, activation='relu'),
-                        Dense(self.n_classes if self.is_multiclass else 1,
-                              activation='softmax' if self.is_multiclass else 'sigmoid')
-                    ])
-                    
-                    model.compile(
-                        optimizer='adam',
-                        loss='sparse_categorical_crossentropy' if self.is_multiclass else 'binary_crossentropy',
-                        metrics=['accuracy']
-                    )
-                    
-                    y_keras = y if self.is_multiclass else y.astype(np.float32)
-                    model.fit(X_fusion, y_keras, epochs=5, batch_size=32, verbose=0)
-                    
-                    self.fusion_model = model
-                    self.framework = 'keras'
+                    import xgboost as xgb
+                    if self.task_type == 'regression':
+                        self.fusion_model = xgb.XGBRegressor(
+                            n_estimators=100, max_depth=6, learning_rate=0.1,
+                            random_state=self.random_state, eval_metric='rmse'
+                        )
+                    else:
+                        if self.is_multiclass:
+                            self.fusion_model = xgb.XGBClassifier(
+                                n_estimators=100, max_depth=6, learning_rate=0.1,
+                                objective='multi:softprob', num_class=self.n_classes,
+                                random_state=self.random_state, eval_metric='mlogloss'
+                            )
+                        else:
+                            self.fusion_model = xgb.XGBClassifier(
+                                n_estimators=100, max_depth=6, learning_rate=0.1,
+                                random_state=self.random_state, eval_metric='logloss'
+                            )
+                    self.fusion_model.fit(X_fusion, y)
+                    self.framework = 'xgboost'
                     
                 except ImportError:
+                    # Fallback to sophisticated MLP with better regularization
                     if self.task_type == 'regression':
                         from sklearn.neural_network import MLPRegressor
                         self.fusion_model = MLPRegressor(
-                            hidden_layer_sizes=(64, 32), max_iter=200,
-                            random_state=self.random_state, early_stopping=True
+                            hidden_layer_sizes=(128, 64, 32), max_iter=500,
+                            random_state=self.random_state, early_stopping=True,
+                            alpha=0.01, learning_rate='adaptive'
                         )
                     else:
                         from sklearn.neural_network import MLPClassifier
                         self.fusion_model = MLPClassifier(
-                            hidden_layer_sizes=(64, 32), max_iter=200,
-                            random_state=self.random_state, early_stopping=True
+                            hidden_layer_sizes=(128, 64, 32), max_iter=500,
+                            random_state=self.random_state, early_stopping=True,
+                            alpha=0.01, learning_rate='adaptive'
                         )
                     self.fusion_model.fit(X_fusion, y)
                     self.framework = 'sklearn'
@@ -837,10 +845,14 @@ class FusionLearner(BaseLearnerInterface):
         if hasattr(self, 'is_multilabel') and self.is_multilabel:
             # Multi-label prediction: directly combine predictions from each modality and label
             n_samples = None
-            for mod in X.values():
-                if n_samples is None:
-                    n_samples = mod.shape[0]
-                break
+            if isinstance(X, dict):
+                for mod in safe_get_values(X):
+                    if n_samples is None:
+                        n_samples = mod.shape[0]
+                    break
+            else:
+                # X is a numpy array
+                n_samples = X.shape[0]
             
             if n_samples is None:
                 return np.zeros((0, self.n_labels), dtype=int)
@@ -1082,11 +1094,14 @@ class ModalityAwareBaseLearnerSelector:
         return learners
 
     def _select_learner_type(self, modalities: List[str], pattern: str) -> str:
-        # Use preferences or default logic
+        """Select learner type based on modalities present in the bag, not optimization strategy."""
+        # Always select based on modality combination, regardless of optimization strategy
         if len(modalities) == 1:
+            # Single modality - use modality-specific learner
             m = modalities[0]
             return self.learner_preferences.get(m, self._default_learner_for_modality(m))
         else:
+            # Multiple modalities - use fusion learner
             return self.learner_preferences.get('multimodal', 'fusion')
     def _default_learner_for_modality(self, modality: str) -> str:
         """Select appropriate specialized learner based on modality type"""
@@ -1100,15 +1115,54 @@ class ModalityAwareBaseLearnerSelector:
             # Default to tabular for unknown modalities
             return 'tabular'
     def _get_architecture_params(self, learner_type: str, modalities: List[str]) -> Dict[str, Any]:
-        # Example: set params based on type
-        if learner_type == 'transformer':
-            return {'embedding_dim': 256, 'num_heads': 8}
-        elif learner_type == 'cnn':
-            return {'channels': [64, 128, 256], 'kernel_size': 3}
+        """Get architecture parameters based on learner type and optimization strategy"""
+        
+        if learner_type == 'tabular':
+            # Different model types based on optimization strategy
+            if self.optimization_strategy == 'speed':
+                return {'model_type': 'svm'}  # Fast SVM
+            elif self.optimization_strategy == 'memory':
+                return {'model_type': 'random_forest'}  # Memory efficient
+            elif self.optimization_strategy == 'accuracy':
+                return {'model_type': 'xgboost'}  # High accuracy
+            else:  # balanced
+                return {'model_type': 'xgboost'}  # Default to xgboost
+                
+        elif learner_type == 'text' or learner_type == 'transformer':
+            # Different model types based on optimization strategy
+            if self.optimization_strategy == 'speed':
+                return {'model_type': 'tfidf'}  # Fast TF-IDF
+            elif self.optimization_strategy == 'memory':
+                return {'model_type': 'lstm'}  # Memory efficient LSTM
+            elif self.optimization_strategy == 'accuracy':
+                return {'model_type': 'transformer'}  # High accuracy transformer
+            else:  # balanced
+                return {'model_type': 'lstm'}  # Default to LSTM
+                
+        elif learner_type == 'image' or learner_type == 'cnn':
+            # Different model types based on optimization strategy
+            if self.optimization_strategy == 'speed':
+                return {'model_type': 'simple_cnn'}  # Fast simple CNN
+            elif self.optimization_strategy == 'memory':
+                return {'model_type': 'cnn'}  # Memory efficient CNN
+            elif self.optimization_strategy == 'accuracy':
+                return {'model_type': 'resnet'}  # High accuracy ResNet
+            else:  # balanced
+                return {'model_type': 'cnn'}  # Default to CNN
+                
+        elif learner_type == 'fusion':
+            # Different fusion types based on optimization strategy
+            if self.optimization_strategy == 'speed':
+                return {'fusion_type': 'concatenation', 'hidden_dim': 64}  # Fast concatenation
+            elif self.optimization_strategy == 'memory':
+                return {'fusion_type': 'weighted', 'hidden_dim': 32}  # Memory efficient
+            elif self.optimization_strategy == 'accuracy':
+                return {'fusion_type': 'attention', 'hidden_dim': 256}  # High accuracy attention
+            else:  # balanced
+                return {'fusion_type': 'attention', 'hidden_dim': 128}  # Default attention
+                
         elif learner_type == 'tree':
             return {'n_estimators': 200, 'max_depth': 10}
-        elif learner_type == 'fusion':
-            return {'fusion_type': 'attention', 'hidden_dim': 128}
         else:
             return {}
     def _instantiate_learner(self, config: LearnerConfig) -> BaseLearnerInterface:
@@ -1191,13 +1245,13 @@ class ModalityAwareBaseLearnerSelector:
                         )
                     def fit(self, X, y):
                         # Concatenate multimodal features
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         self.model.fit(arr, y)
                     def predict(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict(arr)
                     def predict_proba(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict_proba(arr)
                 rs = getattr(self, 'random_state', 42)
                 return RealTextMLP(config.architecture_params.get('embedding_dim', 256), self.n_classes, random_state=rs)
@@ -1222,13 +1276,13 @@ class ModalityAwareBaseLearnerSelector:
                             n_jobs=1  # Single job to avoid conflicts in ensemble
                         )
                     def fit(self, X, y):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         self.model.fit(arr, y)
                     def predict(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict(arr)
                     def predict_proba(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict_proba(arr)
                 rs = getattr(self, 'random_state', 42)
                 return RealRandomForest(config.architecture_params.get('channels', [64,128,256])[0], self.n_classes, random_state=rs)
@@ -1239,13 +1293,13 @@ class ModalityAwareBaseLearnerSelector:
                     def __init__(self, max_depth=10):
                         self.model = DecisionTreeClassifier(max_depth=max_depth)
                     def fit(self, X, y):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         self.model.fit(arr, y)
                     def predict(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict(arr)
                     def predict_proba(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict_proba(arr)
                 return SimpleTree(config.architecture_params.get('max_depth', 10))
             
@@ -1267,13 +1321,13 @@ class ModalityAwareBaseLearnerSelector:
                             random_state=random_state
                         )
                     def fit(self, X, y):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         self.model.fit(arr, y)
                     def predict(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict(arr)
                     def predict_proba(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict_proba(arr)
                 # Use the model's random_state if available, else default
                 rs = getattr(self, 'random_state', 42)
@@ -1282,8 +1336,9 @@ class ModalityAwareBaseLearnerSelector:
             else:
                 from sklearn.linear_model import LogisticRegression
                 class RealLogisticRegression(BaseLearnerInterface):
-                    def __init__(self, n_classes):
+                    def __init__(self, n_classes, random_state=42):
                         self.n_classes = n_classes
+                        self.random_state = random_state
                         # Create robust logistic regression
                         self.model = LogisticRegression(
                             C=1.0,
@@ -1293,18 +1348,18 @@ class ModalityAwareBaseLearnerSelector:
                             class_weight='balanced'  # Handle imbalanced classes
                         )
                     def fit(self, X, y):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         self.model.fit(arr, y)
                         # Store the majority for fallback
                         vals, counts = np.unique(y, return_counts=True)
                         self.majority = vals[np.argmax(counts)]
                     def predict(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict(arr)
                     def predict_proba(self, X):
-                        arr = np.concatenate([v for v in X.values()], axis=1)
+                        arr = np.concatenate(safe_get_values(X), axis=1)
                         return self.model.predict_proba(arr)
-                return RealLogisticRegression(self.n_classes)
+                return RealLogisticRegression(self.n_classes, random_state=self.random_state)
 
     def predict_learner_performance(self, config: LearnerConfig, bag_characteristics: Dict[str, Any]) -> float:
         # Simple heuristic: more modalities/features = higher expected performance

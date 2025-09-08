@@ -1,8 +1,0 @@
-{
-  "dataset": "Amazon Reviews",
-  "n_classes": 5,
-  "train_samples": 500,
-  "test_samples": 100,
-  "random_seed": 42,
-  "num_seeds": 5
-}
