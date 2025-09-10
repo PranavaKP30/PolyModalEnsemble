@@ -1,356 +1,324 @@
 """
 Stage 1: Data Integration
-Advanced multimodal data integration framework providing enterprise-grade data loading, validation, and preprocessing capabilities for heterogeneous data sources.
+Simple multimodal data integration for file-based loading, processing, and saving.
 
 Implements:
-- Universal Data Loading (files, arrays, directories)
-- Enterprise Validation (data quality, shape/type/NaN/Inf checks)
-- Intelligent Preprocessing (cleaning, normalization, outlier/missing handling)
-- Memory Optimization (sparse support, batch, lazy loading)
-- Quality Monitoring (real-time metrics, reporting)
-- Pipeline Integration (export for ensemble generation)
-
-See MainModel/1dataIntegrationDoc.md for full documentation and API reference.
+- File-based data loading (separate files for each modality and labels)
+- Data processing and cleaning
+- Data saving for next stage
 """
 
 import numpy as np
+import pandas as pd
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
 import logging
 
 logger = logging.getLogger("data_integration")
 
-# --- ModalityConfig ---
-@dataclass
-class ModalityConfig:
-    name: str
-    data_type: str  # 'tabular', 'text', 'image', 'audio', etc.
-    feature_dim: Optional[int] = None
-    is_required: bool = False
-    priority: float = 1.0
-    min_feature_ratio: float = 0.3
-    max_feature_ratio: float = 1.0
-
-    def __post_init__(self):
-        assert self.priority >= 0, "Priority must be non-negative"
-        assert 0 <= self.min_feature_ratio <= 1, "min_feature_ratio must be in [0,1]"
-        assert 0 <= self.max_feature_ratio <= 1, "max_feature_ratio must be in [0,1]"
-        assert self.min_feature_ratio <= self.max_feature_ratio, "min_feature_ratio must be <= max_feature_ratio"
-        if self.feature_dim is not None:
-            assert self.feature_dim > 0, "feature_dim must be positive"
-
-# --- DataLoaderInterface ---
-class DataLoaderInterface(ABC):
-    @abstractmethod
-    def load_data(self) -> Dict[str, np.ndarray]:
-        pass
-    @abstractmethod
-    def get_modality_configs(self) -> List[ModalityConfig]:
-        pass
-
-# --- GenericMultiModalDataLoader ---
-class GenericMultiModalDataLoader:
-    def __init__(self, validate_data: bool = True, memory_efficient: bool = False):
-        self.validate_data = validate_data
-        self.memory_efficient = memory_efficient
-        self.data: Dict[str, Any] = {}
-        self.modality_configs: List[ModalityConfig] = []
-        self._data_stats: Dict[str, Any] = {}
-        self._sample_size: int = 0
-        self._quality_report: Optional[Dict[str, Any]] = None
-
-    def add_modality_split(self, name: str, train_data: np.ndarray, test_data: np.ndarray, data_type: str = "tabular", is_required: bool = False, feature_dim: Optional[int] = None):
-        """Add both train and test data for a modality."""
-        if train_data.ndim == 1:
-            train_data = train_data.reshape(-1, 1)
-        if test_data.ndim == 1:
-            test_data = test_data.reshape(-1, 1)
-        if feature_dim is None:
-            feature_dim = train_data.shape[1]
+class SimpleDataLoader:
+    """
+    Simple data loader for file-based multimodal data.
+    
+    Handles:
+    - Loading separate files for each modality and labels
+    - Data processing and cleaning
+    - Saving processed data for next stage
+    """
+    
+    def __init__(self):
+        # Data storage
+        self.train_data = {}
+        self.test_data = {}
+        self.train_labels = None
+        self.test_labels = None
+        self.modality_configs = {}
+        self.verbose = True
         
-        # Validate that train and test have same number of features
-        if train_data.shape[1] != test_data.shape[1]:
-            raise ValueError(f"Train and test data for modality '{name}' must have same number of features. Got {train_data.shape[1]} vs {test_data.shape[1]}")
-        
-        # Validate consistency with existing modalities
-        if hasattr(self, '_sample_size') and self._sample_size > 0:
-            if train_data.shape[0] != self._sample_size:
-                raise ValueError(f"Train data for modality '{name}' must have same number of samples as other modalities. Got {train_data.shape[0]} vs {self._sample_size}")
-        
-        self.data[f"{name}_train"] = train_data
-        self.data[f"{name}_test"] = test_data
-        self.modality_configs.append(ModalityConfig(name, data_type, feature_dim, is_required))
-        self._sample_size = train_data.shape[0]
-        if self.validate_data:
-            self._validate_modality(f"{name}_train", train_data)
-            self._validate_modality(f"{name}_test", test_data)
-
-    def add_labels_split(self, train_labels: np.ndarray, test_labels: np.ndarray, name: str = "labels"):
-        """Add both train and test labels."""
-        if train_labels.ndim == 2 and train_labels.shape[1] == 1:
-            train_labels = train_labels.ravel()
-        if test_labels.ndim == 2 and test_labels.shape[1] == 1:
-            test_labels = test_labels.ravel()
-        
-        # Validate consistency with existing modalities
-        if hasattr(self, '_sample_size') and self._sample_size > 0:
-            if train_labels.shape[0] != self._sample_size:
-                raise ValueError(f"Train labels must have same number of samples as modalities. Got {train_labels.shape[0]} vs {self._sample_size}")
-        
-        # Validate that train and test labels have consistent dimensions
-        if train_labels.ndim != test_labels.ndim:
-            raise ValueError(f"Train and test labels must have same number of dimensions. Got {train_labels.ndim} vs {test_labels.ndim}")
-        
-        # For multi-label classification, validate number of label columns
-        if train_labels.ndim == 2:
-            if train_labels.shape[1] != test_labels.shape[1]:
-                raise ValueError(f"Train and test labels must have same number of label columns. Got {train_labels.shape[1]} vs {test_labels.shape[1]}")
-        
-        self.data[f"{name}_train"] = train_labels
-        self.data[f"{name}_test"] = test_labels
-
-    def get_split(self, split: str = "train"):
-        """Return (data_dict, labels) for the requested split ('train' or 'test')."""
-        data_dict = {k.replace(f"_{split}", ""): v for k, v in self.data.items() if k.endswith(f"_{split}") and not k.startswith("labels")}
-        labels_key = f"labels_{split}"
-        if labels_key not in self.data:
-            raise ValueError(f"No labels found for split '{split}'. Use add_labels_split().")
-        labels = self.data[labels_key]
-        return data_dict, labels
-    def load_and_preprocess(self):
+    def load_from_files(self, 
+                       train_label_file: str,
+                       test_label_file: str,
+                       train_modality_files: Dict[str, str],
+                       test_modality_files: Dict[str, str],
+                       modality_types: Dict[str, str]):
         """
-        Returns (data_dict, labels) for use in the main pipeline.
-        Assumes modalities and labels have already been added via add_modality/add_labels.
+        Load data from separate files.
+        
+        Parameters
+        ----------
+        train_label_file : str
+            Path to training labels file
+        test_label_file : str
+            Path to testing labels file
+        train_modality_files : dict
+            Dict mapping modality names to training data file paths
+        test_modality_files : dict
+            Dict mapping modality names to testing data file paths
+        modality_types : dict
+            Dict mapping modality names to data types ('text', 'image', 'tabular', 'audio')
         """
-        # Find the labels key (default 'labels')
-        labels_key = None
-        for k in self.data:
-            if k.lower() == 'labels':
-                labels_key = k
-                break
-        if labels_key is None:
-            raise ValueError("No labels found in loader. Use add_labels().")
-        data_dict = {k: v for k, v in self.data.items() if k != labels_key}
-        labels = self.data[labels_key]
-        return data_dict, labels
-    def add_modality(self, name: str, data: Union[np.ndarray, str, Path], data_type: str = "tabular", is_required: bool = False, feature_dim: Optional[int] = None):
-        # Load from file if needed
-        if isinstance(data, (str, Path)):
-            ext = str(data).split(".")[-1].lower()
-            if ext == "csv":
-                arr = np.genfromtxt(data, delimiter=",", skip_header=1)
-            elif ext == "npy":
-                arr = np.load(data)
-            elif ext == "npz":
-                arr = np.load(data)[np.load(data).files[0]]
-            else:
-                raise ValueError(f"Unsupported file format: {data}")
-        else:
-            arr = data
-        if arr.ndim == 1:
-            arr = arr.reshape(-1, 1)
-        if feature_dim is None:
-            feature_dim = arr.shape[1]
-        self.data[name] = arr
-        self.modality_configs.append(ModalityConfig(name, data_type, feature_dim, is_required))
-        self._sample_size = arr.shape[0]
-        if self.validate_data:
-            self._validate_modality(name, arr)
-
-    def add_labels(self, labels: Union[np.ndarray, str, Path], name: str = "labels"):
-        if isinstance(labels, (str, Path)):
-            ext = str(labels).split(".")[-1].lower()
-            if ext == "csv":
-                arr = np.genfromtxt(labels, delimiter=",", skip_header=1)
-            elif ext == "npy":
-                arr = np.load(labels)
-            else:
-                raise ValueError(f"Unsupported label file format: {labels}")
-        else:
-            arr = labels
-        if arr.ndim == 2 and arr.shape[1] == 1:
-            arr = arr.ravel()
-        self.data[name] = arr
-
-    def _validate_modality(self, name: str, arr: np.ndarray):
-        stats = {
-            "shape": arr.shape,
-            "nan_count": int(np.isnan(arr).sum()) if np.issubdtype(arr.dtype, np.floating) else 0,
-            "inf_count": int(np.isinf(arr).sum()) if np.issubdtype(arr.dtype, np.floating) else 0,
-            "data_type": str(arr.dtype),
-            "is_required": any(c.name == name and c.is_required for c in self.modality_configs)
-        }
-        self._data_stats[name] = stats
-
-    def clean_data(self, handle_nan: str = 'fill_mean', handle_inf: str = 'fill_max'):
-        for name, arr in self.data.items():
-            if not isinstance(arr, np.ndarray) or arr.dtype.kind not in 'fc':
-                continue
+        if self.verbose:
+            print("Loading data from files...")
+        
+        # Load labels
+        self.train_labels = self._load_file(train_label_file)
+        self.test_labels = self._load_file(test_label_file)
+        
+        # Load modality data
+        for modality_name in train_modality_files.keys():
+            if modality_name not in test_modality_files:
+                raise ValueError(f"Modality '{modality_name}' missing from test files")
             
-            # Handle NaN values
-            if handle_nan == 'drop':
-                mask = ~np.isnan(arr).any(axis=1)
-                arr = arr[mask]
-            elif handle_nan == 'fill_mean':
-                means = np.nanmean(arr, axis=0)
-                inds = np.where(np.isnan(arr))
+            train_file = train_modality_files[modality_name]
+            test_file = test_modality_files[modality_name]
+            data_type = modality_types.get(modality_name, 'tabular')
+            
+            # Load data
+            train_data = self._load_file(train_file)
+            test_data = self._load_file(test_file)
+            
+            # Store data
+            self.train_data[modality_name] = train_data
+            self.test_data[modality_name] = test_data
+            
+            # Store config
+            self.modality_configs[modality_name] = {
+                'data_type': data_type,
+                'feature_dim': train_data.shape[1],
+                'train_samples': train_data.shape[0],
+                'test_samples': test_data.shape[0]
+            }
+            
+            if self.verbose:
+                print(f"  {modality_name}: {data_type} - Train: {train_data.shape}, Test: {test_data.shape}")
+    
+    def _load_file(self, file_path: str) -> np.ndarray:
+        """Load data from file (supports .npy, .csv, .txt)."""
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        if file_path.suffix == '.npy':
+            return np.load(file_path)
+        elif file_path.suffix == '.csv':
+            return pd.read_csv(file_path).values
+        elif file_path.suffix == '.txt':
+            return np.loadtxt(file_path)
+        else:
+            raise ValueError(f"Unsupported file format: {file_path.suffix}")
+    
+    def process_data(self, 
+                    handle_nan: str = 'fill_mean',
+                    handle_inf: str = 'fill_max',
+                    normalize: bool = False,
+                    remove_outliers: bool = False,
+                    outlier_std: float = 3.0):
+        """
+        Process and clean the loaded data.
+        
+        Parameters
+        ----------
+        handle_nan : str
+            How to handle NaN values: 'fill_mean', 'fill_zero', 'drop'
+        handle_inf : str
+            How to handle Inf values: 'fill_max', 'fill_zero', 'drop'
+        normalize : bool
+            Whether to normalize data (z-score scaling)
+        remove_outliers : bool
+            Whether to remove outliers
+        outlier_std : float
+            Standard deviation threshold for outlier removal
+        """
+        if self.verbose:
+            print("Processing data...")
+        
+        # Process training data
+        for modality_name, data in self.train_data.items():
+            self.train_data[modality_name] = self._process_modality_data(
+                data, handle_nan, handle_inf, normalize, remove_outliers, outlier_std
+            )
+        
+        # Process testing data
+        for modality_name, data in self.test_data.items():
+            self.test_data[modality_name] = self._process_modality_data(
+                data, handle_nan, handle_inf, normalize, remove_outliers, outlier_std
+            )
+        
+        # Process labels
+        self.train_labels = self._process_labels(self.train_labels, handle_nan, handle_inf)
+        self.test_labels = self._process_labels(self.test_labels, handle_nan, handle_inf)
+        
+        if self.verbose:
+            print("  Data processing completed")
+    
+    def _process_modality_data(self, data: np.ndarray, handle_nan: str, handle_inf: str, 
+                              normalize: bool, remove_outliers: bool, outlier_std: float) -> np.ndarray:
+        """Process a single modality's data."""
+        processed_data = data.copy()
+        
+        # Handle NaN values
+        if handle_nan == 'fill_mean':
+            if np.issubdtype(processed_data.dtype, np.floating):
+                means = np.nanmean(processed_data, axis=0)
+                inds = np.where(np.isnan(processed_data))
                 if len(inds) == 2:  # 2D array
-                    arr[inds] = np.take(means, inds[1])
-                else:  # 1D array
-                    arr[inds] = means
-            elif handle_nan == 'fill_zero':
-                arr = np.nan_to_num(arr, nan=0.0)
-            
-            # Handle Inf values
-            if handle_inf == 'drop':
-                mask = ~np.isinf(arr).any(axis=1)
-                arr = arr[mask]
-            elif handle_inf == 'fill_max':
-                # Use nanmax to ignore Inf values when computing max
-                maxs = np.nanmax(arr, axis=0)
-                # If maxs still contains Inf, replace with a large finite value
+                    processed_data[inds] = np.take(means, inds[1])
+        elif handle_nan == 'fill_zero':
+            processed_data = np.nan_to_num(processed_data, nan=0.0)
+        elif handle_nan == 'drop':
+            if np.issubdtype(processed_data.dtype, np.floating):
+                mask = ~np.isnan(processed_data).any(axis=1)
+                processed_data = processed_data[mask]
+        
+        # Handle Inf values
+        if handle_inf == 'fill_max':
+            if np.issubdtype(processed_data.dtype, np.floating):
+                maxs = np.nanmax(processed_data, axis=0)
                 maxs = np.where(np.isinf(maxs), 1e6, maxs)
-                inds = np.where(np.isinf(arr))
+                inds = np.where(np.isinf(processed_data))
                 if len(inds) == 2:  # 2D array
-                    arr[inds] = np.take(maxs, inds[1])
-                else:  # 1D array
-                    arr[inds] = maxs
-            elif handle_inf == 'fill_zero':
-                arr = np.where(np.isinf(arr), 0.0, arr)
-            
-            self.data[name] = arr
-
-    def get_data_quality_report(self) -> Dict[str, Any]:
-        report = {"modalities": {}, "overall": {}}
-        total_samples = None
-        for config in self.modality_configs:
-            arr = self.data[config.name]
-            stats = self._data_stats.get(config.name, {})
-            if not stats:
-                self._validate_modality(config.name, arr)
-                stats = self._data_stats[config.name]
-            report["modalities"][config.name] = stats
-            if total_samples is None:
-                total_samples = arr.shape[0]
-        report["overall"] = {
-            "validation_enabled": self.validate_data,
-            "total_samples": total_samples,
-            "total_modalities": len(self.modality_configs),
-            "required_modalities": sum(c.is_required for c in self.modality_configs)
-        }
-        return report
-
-    def export_for_ensemble_generation(self) -> Tuple[Dict[str, np.ndarray], List[ModalityConfig], Dict[str, Any]]:
-        integration_metadata = {
-            'sample_size': self._sample_size,
-            'dataset_size': self._sample_size,
-            'num_modalities': len(self.modality_configs),
-            'modality_names': [c.name for c in self.modality_configs],
-            'feature_dimensions': {c.name: c.feature_dim for c in self.modality_configs},
-            'data_quality_report': self.get_data_quality_report()
-        }
-        return self.data, self.modality_configs, integration_metadata
-
-    def summary(self):
-        print("Data Integration Summary:")
-        for name, arr in self.data.items():
-            print(f"- {name}: shape={arr.shape}, dtype={arr.dtype}")
-        print(f"Modalities: {[c.name for c in self.modality_configs]}")
-        print(f"Total samples: {self._sample_size}")
-
-# --- QuickDatasetBuilder ---
-class QuickDatasetBuilder:
-    @staticmethod
-    def from_arrays(modality_data: Dict[str, np.ndarray], modality_types: Optional[Dict[str, str]] = None, labels: Optional[np.ndarray] = None, required_modalities: Optional[List[str]] = None) -> 'GenericMultiModalDataLoader':
-        loader = GenericMultiModalDataLoader()
-        modality_types = modality_types or {}
-        required_modalities = required_modalities or []
-        for name, data in modality_data.items():
-            data_type = modality_types.get(name, "tabular")
-            is_required = name in required_modalities
-            loader.add_modality(name, data, data_type, is_required)
-        if labels is not None:
-            loader.add_labels(labels)
-        return loader
-
-    @staticmethod
-    def from_files(file_paths: Dict[str, str], modality_types: Optional[Dict[str, str]] = None, required_modalities: Optional[List[str]] = None) -> 'GenericMultiModalDataLoader':
-        loader = GenericMultiModalDataLoader()
-        modality_types = modality_types or {}
-        required_modalities = required_modalities or []
-        for name, file_path in file_paths.items():
-            data_type = modality_types.get(name, "tabular")
-            is_required = name in required_modalities
-            loader.add_modality(name, file_path, data_type, is_required)
-        return loader
-
-    @staticmethod
-    def from_directory(data_dir: str, modality_patterns: Dict[str, str], modality_types: Optional[Dict[str, str]] = None, required_modalities: Optional[List[str]] = None) -> 'GenericMultiModalDataLoader':
-        loader = GenericMultiModalDataLoader()
-        data_dir = Path(data_dir)
-        modality_types = modality_types or {}
-        required_modalities = required_modalities or []
-        for modality_name, pattern in modality_patterns.items():
-            matching_files = list(data_dir.glob(pattern))
-            if matching_files:
-                file_path = matching_files[0]
-                data_type = modality_types.get(modality_name, "tabular")
-                is_required = modality_name in required_modalities
-                loader.add_modality(modality_name, file_path, data_type, is_required)
-            else:
-                print(f"Warning: No files found for modality '{modality_name}' with pattern '{pattern}'")
-        return loader
-
-# --- Utility Functions ---
-def create_synthetic_dataset(modality_specs: Dict[str, Tuple[int, str]], n_samples: int = 1000, n_classes: int = 10, noise_level: float = 0.1, missing_data_rate: float = 0.0, random_state: Optional[int] = None) -> GenericMultiModalDataLoader:
-    rng = np.random.default_rng(random_state)
-    loader = GenericMultiModalDataLoader()
-    for name, (feature_dim, data_type) in modality_specs.items():
-        data = rng.normal(0, 1, size=(n_samples, feature_dim))
-        if noise_level > 0:
-            data += rng.normal(0, noise_level, size=data.shape)
-        if missing_data_rate > 0:
-            mask = rng.uniform(0, 1, size=data.shape) < missing_data_rate
-            data[mask] = np.nan
-        loader.add_modality(name, data, data_type=data_type)
-    labels = rng.integers(0, n_classes, size=n_samples)
-    loader.add_labels(labels)
-    return loader
-
-def auto_preprocess_dataset(loader: GenericMultiModalDataLoader, normalize: bool = True, handle_missing: str = 'mean', remove_outliers: bool = False, outlier_std: float = 3.0) -> GenericMultiModalDataLoader:
-    new_loader = GenericMultiModalDataLoader(validate_data=loader.validate_data, memory_efficient=loader.memory_efficient)
-    for config in loader.modality_configs:
-        data = loader.data[config.name]
-        # Handle missing values
-        if handle_missing == 'mean':
-            if np.issubdtype(data.dtype, np.floating):
-                means = np.nanmean(data, axis=0)
-                inds = np.where(np.isnan(data))
-                data[inds] = np.take(means, inds[1])
-        elif handle_missing == 'zero':
-            data = np.nan_to_num(data, nan=0.0)
-        elif handle_missing == 'drop':
-            if np.issubdtype(data.dtype, np.floating):
-                mask = ~np.isnan(data).any(axis=1)
-                data = data[mask]
+                    processed_data[inds] = np.take(maxs, inds[1])
+        elif handle_inf == 'fill_zero':
+            processed_data = np.where(np.isinf(processed_data), 0.0, processed_data)
+        elif handle_inf == 'drop':
+            if np.issubdtype(processed_data.dtype, np.floating):
+                mask = ~np.isinf(processed_data).any(axis=1)
+                processed_data = processed_data[mask]
+        
         # Remove outliers
-        if remove_outliers and np.issubdtype(data.dtype, np.floating):
-            mean = np.mean(data, axis=0)
-            std = np.std(data, axis=0)
-            mask = np.all(np.abs(data - mean) < outlier_std * std, axis=1)
-            data = data[mask]
+        if remove_outliers and np.issubdtype(processed_data.dtype, np.floating):
+            mean = np.mean(processed_data, axis=0)
+            std = np.std(processed_data, axis=0)
+            mask = np.all(np.abs(processed_data - mean) < outlier_std * std, axis=1)
+            processed_data = processed_data[mask]
+        
         # Normalize
-        if normalize and np.issubdtype(data.dtype, np.floating):
-            mean = np.mean(data, axis=0)
-            std = np.std(data, axis=0)
+        if normalize and np.issubdtype(processed_data.dtype, np.floating):
+            mean = np.mean(processed_data, axis=0)
+            std = np.std(processed_data, axis=0)
             std[std == 0] = 1.0
-            data = (data - mean) / std
-        new_loader.add_modality(config.name, data, data_type=config.data_type, is_required=config.is_required)
-    # Copy labels if present
-    for k, v in loader.data.items():
-        if 'label' in k.lower() and k not in new_loader.data:
-            new_loader.add_labels(v, name=k)
-    return new_loader
+            processed_data = (processed_data - mean) / std
+        
+        return processed_data
+    
+    def _process_labels(self, labels: np.ndarray, handle_nan: str, handle_inf: str) -> np.ndarray:
+        """Process labels (simpler than modality data)."""
+        processed_labels = labels.copy()
+        
+        # Handle NaN values
+        if handle_nan == 'fill_zero':
+            processed_labels = np.nan_to_num(processed_labels, nan=0.0)
+        elif handle_nan == 'drop':
+            if np.issubdtype(processed_labels.dtype, np.floating):
+                mask = ~np.isnan(processed_labels)
+                processed_labels = processed_labels[mask]
+        
+        # Handle Inf values
+        if handle_inf == 'fill_zero':
+            processed_labels = np.where(np.isinf(processed_labels), 0.0, processed_labels)
+        elif handle_inf == 'drop':
+            if np.issubdtype(processed_labels.dtype, np.floating):
+                mask = ~np.isinf(processed_labels)
+                processed_labels = processed_labels[mask]
+        
+        return processed_labels
+    
+    def get_processed_data(self):
+        """
+        Get processed data for use by next stage (memory only, no file saving).
+        
+        Returns
+        -------
+        dict
+            Dictionary containing all processed data and metadata
+        """
+        if self.verbose:
+            print("Preparing processed data for next stage...")
+        
+        # Create data package for Stage 2
+        processed_data = {
+            'train_data': self.train_data,
+            'test_data': self.test_data,
+            'train_labels': self.train_labels,
+            'test_labels': self.test_labels,
+            'modality_configs': self.modality_configs,
+            'metadata': {
+                'train_samples': len(self.train_labels),
+                'test_samples': len(self.test_labels),
+                'n_modalities': len(self.modality_configs)
+            }
+        }
+        
+        if self.verbose:
+            print(f"  Prepared {len(self.modality_configs)} modalities")
+            print(f"  Train samples: {len(self.train_labels)}")
+            print(f"  Test samples: {len(self.test_labels)}")
+        
+        return processed_data
+    
+    
+    def get_data_summary(self) -> Dict[str, Any]:
+        """Get summary of loaded data."""
+        summary = {
+            'modalities': {},
+            'overall': {
+                'train_samples': len(self.train_labels) if self.train_labels is not None else 0,
+                'test_samples': len(self.test_labels) if self.test_labels is not None else 0,
+                'n_modalities': len(self.modality_configs)
+            }
+        }
+        
+        for modality_name, config in self.modality_configs.items():
+            summary['modalities'][modality_name] = {
+                'data_type': config['data_type'],
+                'feature_dim': config['feature_dim'],
+                'train_shape': self.train_data[modality_name].shape if modality_name in self.train_data else None,
+                'test_shape': self.test_data[modality_name].shape if modality_name in self.test_data else None
+            }
+        
+        return summary
+    
+    def print_summary(self):
+        """Print data summary."""
+        summary = self.get_data_summary()
+        
+        print("Data Summary:")
+        print(f"  Train samples: {summary['overall']['train_samples']}")
+        print(f"  Test samples: {summary['overall']['test_samples']}")
+        print(f"  Modalities: {summary['overall']['n_modalities']}")
+        
+        for modality_name, info in summary['modalities'].items():
+            print(f"  {modality_name}: {info['data_type']} - {info['feature_dim']} features")
+            print(f"    Train: {info['train_shape']}, Test: {info['test_shape']}")
+
+# Convenience function for quick data loading
+def load_and_process_data(train_label_file: str,
+                         test_label_file: str,
+                         train_modality_files: Dict[str, str],
+                         test_modality_files: Dict[str, str],
+                         modality_types: Dict[str, str],
+                         **processing_kwargs) -> SimpleDataLoader:
+    """
+    Convenience function to load and process data in one step (memory only).
+    
+    Returns
+    -------
+    SimpleDataLoader
+        Loaded and processed data loader
+    """
+    loader = SimpleDataLoader()
+    loader.verbose = True
+    
+    # Load data
+    loader.load_from_files(
+        train_label_file, test_label_file,
+        train_modality_files, test_modality_files,
+        modality_types
+    )
+    
+    # Process data
+    loader.process_data(**processing_kwargs)
+    
+    return loader

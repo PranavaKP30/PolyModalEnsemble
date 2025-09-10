@@ -117,34 +117,6 @@ class TransformerMetaLearner(nn.Module):
         modality_weights_expanded = self.modality_weights.unsqueeze(0).expand(batch_size, -1)
         
         # Step 5: Combine attention with generalization and modality importance
-        # Ensure all tensors have the same shape (batch_size, n_learners)
-        target_shape = attention_logits.shape
-        
-        if confidence.shape != target_shape:
-            if confidence.shape[0] == target_shape[0] and confidence.shape[1] != target_shape[1]:
-                # Resize confidence to match target shape
-                confidence = confidence[:, :target_shape[1]] if confidence.shape[1] > target_shape[1] else torch.cat([confidence, torch.zeros(target_shape[0], target_shape[1] - confidence.shape[1])], dim=1)
-            else:
-                confidence = torch.zeros(target_shape)
-        
-        if uncertainty.shape != target_shape:
-            if uncertainty.shape[0] == target_shape[0] and uncertainty.shape[1] != target_shape[1]:
-                uncertainty = uncertainty[:, :target_shape[1]] if uncertainty.shape[1] > target_shape[1] else torch.cat([uncertainty, torch.zeros(target_shape[0], target_shape[1] - uncertainty.shape[1])], dim=1)
-            else:
-                uncertainty = torch.zeros(target_shape)
-        
-        if gen_scores.shape != target_shape:
-            if gen_scores.shape[0] == target_shape[0] and gen_scores.shape[1] != target_shape[1]:
-                gen_scores = gen_scores[:, :target_shape[1]] if gen_scores.shape[1] > target_shape[1] else torch.cat([gen_scores, torch.zeros(target_shape[0], target_shape[1] - gen_scores.shape[1])], dim=1)
-            else:
-                gen_scores = torch.zeros(target_shape)
-        
-        if modality_weights_expanded.shape != target_shape:
-            if modality_weights_expanded.shape[0] == target_shape[0] and modality_weights_expanded.shape[1] != target_shape[1]:
-                modality_weights_expanded = modality_weights_expanded[:, :target_shape[1]] if modality_weights_expanded.shape[1] > target_shape[1] else torch.cat([modality_weights_expanded, torch.zeros(target_shape[0], target_shape[1] - modality_weights_expanded.shape[1])], dim=1)
-            else:
-                modality_weights_expanded = torch.zeros(target_shape)
-        
         # Higher generalization score = more weight
         # Higher confidence = more weight  
         # Lower uncertainty = more weight
@@ -302,24 +274,10 @@ class EnsemblePredictor:
         
         for i, learner in enumerate(self.trained_learners):
             try:
-                # Try different prediction methods
-                pred = None
                 if hasattr(learner, 'predict_proba') and self.task_type == "classification":
                     pred = learner.predict_proba(test_data)
-                elif hasattr(learner, 'predict'):
-                    pred = learner.predict(test_data)
-                elif hasattr(learner, 'forward'):
-                    # For PyTorch models, use forward pass
-                    with torch.no_grad():
-                        pred = learner.forward(test_data)
-                        if isinstance(pred, torch.Tensor):
-                            pred = pred.cpu().numpy()
                 else:
-                    # Fallback: create dummy predictions
-                    if self.task_type == "classification":
-                        pred = np.ones((n_samples, n_classes)) / n_classes
-                    else:
-                        pred = np.zeros(n_samples)
+                    pred = learner.predict(test_data)
                 
                 if self.task_type == "classification":
                     if pred.ndim == 1:  # Convert to probabilities if needed
@@ -436,22 +394,11 @@ class EnsemblePredictor:
         modality_importance = {}
         
         for bag_char in self.bag_characteristics:
-            if bag_char is not None:
-                # Handle different types of bag characteristics
-                if hasattr(bag_char, 'modality_weights') and bag_char.modality_weights:
-                    for modality, weight in bag_char.modality_weights.items():
-                        if modality not in modality_importance:
-                            modality_importance[modality] = 0.0
-                        modality_importance[modality] += weight
-                elif isinstance(bag_char, dict) and 'modality_weights' in bag_char:
-                    for modality, weight in bag_char['modality_weights'].items():
-                        if modality not in modality_importance:
-                            modality_importance[modality] = 0.0
-                        modality_importance[modality] += weight
-        
-        # If no modality importance found, create default
-        if not modality_importance:
-            modality_importance = {'text': 0.5, 'image': 0.5}  # Default equal weights
+            if 'modality_weights' in bag_char:
+                for modality, weight in bag_char['modality_weights'].items():
+                    if modality not in modality_importance:
+                        modality_importance[modality] = 0.0
+                    modality_importance[modality] += weight
         
         # Normalize
         total_weight = sum(modality_importance.values())
@@ -485,25 +432,9 @@ def run_simple_ablation_test(predictor: EnsemblePredictor, test_data: Dict[str, 
         
         # Compute accuracy
         if predictor.task_type == "classification":
-            if predictions.ndim == 1:
-                pred_classes = predictions
-            else:
-                pred_classes = np.argmax(predictions, axis=1)
-            
-            # Ensure shapes match
-            if len(pred_classes) != len(test_labels):
-                if len(pred_classes) < len(test_labels):
-                    pred_classes = np.tile(pred_classes, (len(test_labels) // len(pred_classes) + 1))[:len(test_labels)]
-                else:
-                    pred_classes = pred_classes[:len(test_labels)]
-            
+            pred_classes = np.argmax(predictions, axis=1)
             accuracy = np.mean(pred_classes == test_labels)
         else:
-            if len(predictions) != len(test_labels):
-                if len(predictions) < len(test_labels):
-                    predictions = np.tile(predictions, (len(test_labels) // len(predictions) + 1))[:len(test_labels)]
-                else:
-                    predictions = predictions[:len(test_labels)]
             mse = np.mean((predictions - test_labels) ** 2)
             accuracy = 1.0 / (1.0 + mse)  # Convert MSE to accuracy-like score
         
@@ -583,25 +514,9 @@ def run_simple_robustness_test(predictor: EnsemblePredictor, test_data: Dict[str
         
         # Compute accuracy on noisy data
         if predictor.task_type == "classification":
-            if predictions.ndim == 1:
-                pred_classes = predictions
-            else:
-                pred_classes = np.argmax(predictions, axis=1)
-            
-            # Ensure shapes match
-            if len(pred_classes) != len(test_labels):
-                if len(pred_classes) < len(test_labels):
-                    pred_classes = np.tile(pred_classes, (len(test_labels) // len(pred_classes) + 1))[:len(test_labels)]
-                else:
-                    pred_classes = pred_classes[:len(test_labels)]
-            
+            pred_classes = np.argmax(predictions, axis=1)
             accuracy = np.mean(pred_classes == test_labels)
         else:
-            if len(predictions) != len(test_labels):
-                if len(predictions) < len(test_labels):
-                    predictions = np.tile(predictions, (len(test_labels) // len(predictions) + 1))[:len(test_labels)]
-                else:
-                    predictions = predictions[:len(test_labels)]
             mse = np.mean((predictions - test_labels) ** 2)
             accuracy = 1.0 / (1.0 + mse)
         

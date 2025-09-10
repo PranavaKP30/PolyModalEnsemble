@@ -13,45 +13,38 @@ Novel Features:
 
 Stage 1:
 //Summary
-Stage 1 is the data foundation layer that takes raw multimodal input data and transforms it into clean, validated, and properly formatted data ready for ensemble generation. When you provide your multimodal data (like text, image, and audio features) along with labels, Stage 1 first performs comprehensive data validation to check for shape consistency, data types, missing values (NaN), and infinite values (Inf) across all modalities. It then automatically splits your data into training (80%) and test (20%) sets while ensuring that all modalities have the same number of samples and that train/test splits are consistent.
-The stage then applies intelligent data cleaning and preprocessing based on your configuration. It handles missing values by either filling them with mean values, zeros, or dropping problematic samples, and it manages infinite values by replacing them with maximum values or zeros. If enabled, it can also normalize the data and remove outliers using statistical thresholds. Crucially, Stage 1 converts your labels from 1-indexed format (common in many datasets) to 0-indexed format (required by machine learning models), ensuring compatibility with downstream stages.
-Finally, Stage 1 exports the cleaned and validated data along with comprehensive metadata for the next stage. This includes the training and test data dictionaries, modality configurations (data types, feature dimensions, requirements), and a detailed data quality report. The stage essentially acts as a robust data pipeline that ensures all subsequent stages receive high-quality, consistent multimodal data, making it the critical foundation that enables reliable ensemble learning across different data modalities.
+Stage 1 begins with data loading through the load_from_files() method, which accepts file paths for training and testing labels along with modality-specific data files (supporting .npy, .csv, and .txt formats) and automatically detects data types while storing everything in memory within the SimpleDataLoader object. The data validation step ensures shape consistency across modalities, validates data types, and performs basic integrity checks to confirm that training and testing data have compatible dimensions and that all required modalities are present. Next comes data cleaning via the process_data() method, which handles missing values using configurable strategies (handle_nan: 'fill_mean', 'fill_zero', or 'drop'), manages infinite values (handle_inf: 'fill_max', 'fill_zero', or 'drop'), and optionally removes statistical outliers based on a configurable standard deviation threshold (outlier_std, default 3.0). The data preprocessing step applies optional z-score normalization (normalize parameter) to scale features to zero mean and unit variance, ensuring all modalities are processed consistently while preserving the original data structure. Finally, data preparation occurs through the get_processed_data() method, which packages all cleaned and processed data (train_data, test_data, train_labels, test_labels, modality_configs, and metadata) into a dictionary format that can be directly passed to Stage 2, with the entire process being memory-only (no physical file creation) for efficiency. The data quality reporting feature via get_data_summary() and print_summary() provides comprehensive statistics about the loaded and processed data for validation and debugging purposes.
 
 //Hyperparameters
-🎯 CORE DATA VALIDATION HYPERPARAMETERS
-1. validate_data
-Description: Enables comprehensive data validation including shape consistency, data type checks, NaN/Inf detection, and feature dimension validation across all modalities
+🔧 CORE DATA INTEGRATION HYPERPARAMETERS
+verbose
+Description: Enables verbose logging and progress information during data loading and processing
 Range: [True, False]
 Default: True
-Testing: FIXED - Keep True for data integrity
-2. memory_efficient
-Description: Enables memory optimization mode for large datasets, including sparse data support, batch processing, and lazy loading to reduce memory footprint
-Range: [True, False]
-Default: False
-Testing: FIXED - Keep False for standard processing
-🧹 DATA CLEANING HYPERPARAMETERS
-3. handle_nan
+Testing: FIXED - Keep True for debugging and monitoring
+�� DATA CLEANING HYPERPARAMETERS
+handle_nan
 Description: Strategy for handling missing values (NaN) in the data - can fill with mean values, zeros, or drop samples with missing data
 Range: ['fill_mean', 'fill_zero', 'drop']
 Default: 'fill_mean'
 Testing: FIXED - Keep 'fill_mean' for robust handling
-4. handle_inf
+handle_inf
 Description: Strategy for handling infinite values (Inf) in the data - can fill with maximum values, zeros, or drop samples with infinite values
 Range: ['fill_max', 'fill_zero', 'drop']
 Default: 'fill_max'
 Testing: FIXED - Keep 'fill_max' for robust handling
-�� DATA PREPROCESSING HYPERPARAMETERS
-5. normalize_data
+🔧 DATA PREPROCESSING HYPERPARAMETERS
+normalize
 Description: Enables data normalization (standardization) to scale features to zero mean and unit variance, which can improve model performance
 Range: [True, False]
 Default: False
 Testing: FIXED - Keep False (let models handle normalization)
-6. remove_outliers
+remove_outliers
 Description: Enables outlier removal using statistical thresholds to remove samples that are more than N standard deviations from the mean
 Range: [True, False]
 Default: False
 Testing: FIXED - Keep False (preserve data integrity)
-7. outlier_std
+outlier_std
 Description: Standard deviation threshold for outlier detection - samples beyond this threshold are considered outliers and removed
 Range: [1.0, 2.0, 3.0, 4.0, 5.0]
 Default: 3.0
@@ -59,22 +52,14 @@ Testing: FIXED - Keep 3.0 (standard threshold)
 
 Stage 2:
 //Summary
-Stage 2 is the ensemble generation engine that takes the clean, validated multimodal data from Stage 1 and creates diverse "bags" of data for ensemble learning using your novel modality dropout strategies. This stage generates multiple ensemble bags (configurable number, typically 5-20) where each bag contains a different combination of modalities and features. The core innovation here is the adaptive modality dropout strategy that dynamically adjusts which modalities are included in each bag based on real-time ensemble diversity monitoring, ensuring optimal diversity across the ensemble.
-The stage implements four distinct dropout strategies: linear, exponential, random, and your novel adaptive strategy. The adaptive strategy is particularly innovative because it continuously monitors the diversity of the ensemble as bags are being created and adjusts the dropout rate accordingly - if diversity is too low, it increases dropout to create more varied bags, and if diversity is sufficient, it reduces dropout to maintain efficiency. This creates a self-regulating system that automatically optimizes ensemble diversity without manual tuning.
-Beyond modality dropout, Stage 2 also implements hierarchical feature sampling where it can sample different subsets of features within each modality, and comprehensive bootstrap sampling to create varied data subsets for each bag. Each bag is fully configured with detailed metadata including which modalities are active, which features are selected, the dropout rate used, and diversity scores. This rich configuration system enables exact reconstruction of each bag's data structure during prediction in Stage 5, ensuring that each trained learner receives the exact same data format it was trained on. The stage essentially creates a diverse, well-configured ensemble foundation that maximizes the benefits of ensemble learning while maintaining the flexibility to handle different multimodal scenarios.
+Stage 2 begins with Initialization where the ModalityDropoutBagger class is instantiated with training data, labels, modality configurations, and hyperparameters including the number of bags, dropout strategy, maximum dropout rate, minimum modalities, sample ratio, and feature sampling ratio. The Dropout Rate Calculation step implements four strategies: linear (gradual increase), exponential (exponential curve), random (uniform distribution), and the novel Adaptive strategy which computes variance-based modality importance scores, calculates inverse proportional dropout probabilities, enforces distinct modality combinations across bags, and maximizes ensemble diversity through dynamic probability adjustments. The Modality & Feature Mask Generation step creates boolean masks for each bag, determining which modalities are active based on dropout probabilities and which specific features are selected within each active modality using the feature sampling ratio, with the adaptive strategy ensuring high-importance modalities are retained more frequently while maintaining diversity. Bootstrap Sampling extracts random subsets of training data for each bag using the specified sample ratio, creating diverse training sets that prevent overfitting and improve ensemble robustness. Bag Configuration Creation generates BagConfig dataclass objects containing bag metadata including bag ID, data indices, modality masks, feature masks, dropout rates, sample ratios, diversity scores, creation timestamps, and additional metadata for tracking and analysis. Data Access & Analytics provides methods for retrieving bag data (get_bag_data()), bag information (get_bag_info()), ensemble statistics (get_ensemble_stats()), and interpretability data (get_stage2_interpretability_data()), enabling comprehensive analysis of the generated ensemble structure. Finally, Interpretability Data captures modality importance scores, feature selection patterns, dropout rate distributions, diversity metrics, and bag metadata, storing everything in memory for seamless access by subsequent stages while maintaining the complete ensemble configuration needed for training and prediction phases.
 
 //Novel Features Present
-Primary Novel Contributions:
-Adaptive Modality Dropout: First implementation of diversity-driven adaptive modality dropout
-Hierarchical Feature Sampling: Novel two-level sampling for multimodal ensembles
-Real-Time Diversity Optimization: Continuous diversity monitoring and adjustment
-Secondary Novel Contributions:
-Comprehensive Bag Management: Production-grade bag configuration system
-Ensemble Diversity Optimization: Systematic diversity-driven ensemble generation
-Modality-Aware Sampling: Cross-modal relationship preservation
+The Adaptive Modality + Feature Dropout Strategy is a novel ensemble generation approach that dynamically optimizes ensemble diversity and robustness through intelligent modality and feature selection. The strategy begins with Modality Importance Computation where the _compute_modality_importance() function calculates variance-based importance scores for each modality by computing the variance of each modality's features, normalizing these scores to sum to 1, and storing them as _modality_importance for subsequent use. The Inverse Proportional Dropout Calculation step uses the _adaptive_dropout_strategy() function to compute dropout probabilities that are inversely proportional to modality importance, ensuring high-impact modalities are retained more frequently while maintaining diversity through the formula dropout_prob = max_dropout_rate * (1 - importance_score), with additional constraints to prevent extreme dropout rates.
+The Distinct Modality Combination Enforcement ensures that each bag has a unique combination of active modalities by tracking previously used modality combinations and adjusting dropout probabilities to avoid repetition, creating diverse ensemble members that explore different modality subspaces. Feature-Level Sampling implements the _create_feature_masks() function with the feature_sampling_ratio parameter, randomly selecting a subset of features within each active modality (e.g., 40 out of 50 text features, 24 out of 30 image features) to create intra-modality diversity and prevent overfitting to specific feature patterns. The Ensemble Diversity Maximization step calculates diversity scores using Hamming distance between modality masks across bags, dynamically adjusting sampling probabilities to maximize ensemble diversity while preserving predictive performance, ensuring that the generated bags explore different regions of the modality-feature space.
+The Dynamic Probability Adjustment mechanism continuously updates modality importance scores and dropout probabilities during bag generation, incorporating feedback from diversity metrics to optimize the balance between modality retention and ensemble diversity. Metadata Capture and Storage records all adaptive decisions including modality importance scores, feature selection patterns, dropout rate distributions, and diversity metrics in the BagConfig objects and interpretability data structures, providing complete traceability of the adaptive process. Finally, Cross-Bag Optimization ensures that the ensemble as a whole benefits from the adaptive strategy by considering inter-bag relationships, preventing redundant bag configurations, and optimizing the overall ensemble composition for maximum predictive performance and robustness, creating a novel approach that goes beyond traditional static dropout strategies by incorporating data-driven, dynamic, and diversity-aware modality and feature selection.
 
 //Hyperparameters
-🎯 CORE ENSEMBLE GENERATION HYPERPARAMETERS
 1. n_bags
 Description: Number of ensemble bags to create - determines the size of the ensemble and affects diversity and computational cost
 Range: [3, 5, 10, 15, 20, 25, 30]
@@ -96,39 +81,19 @@ Range: [1, 2, 3] (depends on total modalities)
 Default: 1
 Testing: FIXED - Keep 1 for maximum flexibility
 🎯 DIVERSITY OPTIMIZATION HYPERPARAMETERS
-5. diversity_target
-Description: Target diversity level for the ensemble - used by adaptive dropout strategy to maintain optimal diversity
-Range: [0.3, 0.5, 0.7, 0.9]
-Default: 0.7
-Testing: VARY - Key parameter for adaptive strategy
-6. sample_ratio
+5. sample_ratio
 Description: Bootstrap sampling ratio for each bag - controls how much of the training data is sampled for each bag
 Range: [0.6, 0.7, 0.8, 0.9]
 Default: 0.8
 Testing: VARY - Affects bag diversity and training data coverage
 🎯 FEATURE SAMPLING HYPERPARAMETERS
-7. feature_sampling
-Description: Enables hierarchical feature sampling within modalities - your novel two-level sampling system
-Range: [True, False]
-Default: True
+6. feature_sampling_ratio
+Description: Ratio of features to sample within each active modality - enables hierarchical feature sampling within modalities
+Range: [0.3, 0.5, 0.7, 0.8, 0.9]
+Default: 0.8
 Testing: VARY - Novel feature testing
-8. min_feature_ratio (per modality)
-Description: Minimum ratio of features to sample within each modality - ensures minimum feature coverage
-Range: [0.3, 0.5, 0.7]
-Default: 0.3
-Testing: FIXED - Keep 0.3 for reasonable coverage
-9. max_feature_ratio (per modality)
-Description: Maximum ratio of features to sample within each modality - controls feature sampling upper bound
-Range: [0.7, 0.8, 0.9, 1.0]
-Default: 1.0
-Testing: FIXED - Keep 1.0 for maximum flexibility
 🎯 VALIDATION AND CONTROL HYPERPARAMETERS
-10. enable_validation
-Description: Enables bag configuration validation and quality checks during generation
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for data integrity
-11. random_state
+7. random_state
 Description: Random seed for reproducible ensemble generation and bag creation - set based on test run number during experiments
 Range: [42, 123, 456, 789, 1000, ...] (any integer)
 Default: 42
@@ -138,9 +103,9 @@ Testing: EXPERIMENT-DEPENDENT - Set based on test run number, not varied per tes
 1. ADAPTIVE MODALITY DROPOUT ABLATION STUDY
 Study Name: Adaptive_Modality_Dropout_Ablation
 Feature Being Tested:
-Adaptive Modality Dropout Strategy - Your novel diversity-driven adaptive dropout that dynamically adjusts dropout rates based on real-time ensemble diversity monitoring
+Adaptive Modality Dropout Strategy - Your novel diversity-driven adaptive dropout that dynamically adjusts dropout rates based on real-time ensemble diversity monitoring, variance-based modality importance computation, inverse proportional dropout calculation, distinct modality combination enforcement, and ensemble diversity maximization
 Control (Baseline):
-Static Dropout Strategies: linear, exponential, random dropout strategies that use fixed dropout rates without diversity optimization
+Static Dropout Strategies: linear, exponential, random dropout strategies that use fixed dropout rates without diversity optimization or modality importance consideration
 Variables for the Study:
 ablation_variables = [
     # Control group (baselines)
@@ -151,2355 +116,2127 @@ ablation_variables = [
     # Treatment group (your novel feature)
     {'name': 'Adaptive_Novel', 'dropout_strategy': 'adaptive'},
     
-    # Additional adaptive variants
-    {'name': 'Adaptive_Low_Diversity', 'dropout_strategy': 'adaptive', 'diversity_target': 0.3},
-    {'name': 'Adaptive_High_Diversity', 'dropout_strategy': 'adaptive', 'diversity_target': 0.9},
+    # Additional adaptive variants for sensitivity analysis
+    {'name': 'Adaptive_Low_Dropout', 'dropout_strategy': 'adaptive', 'max_dropout_rate': 0.3},
+    {'name': 'Adaptive_High_Dropout', 'dropout_strategy': 'adaptive', 'max_dropout_rate': 0.7},
 ]
+Metrics to Compare:
+Ensemble diversity (Hamming distance between modality masks)
+Predictive performance (accuracy, F1-score, AUC-ROC)
+Modality utilization patterns
+Feature selection diversity
+Computational efficiency
+Robustness to missing modalities
+Expected Outcome:
+Adaptive strategy should demonstrate superior ensemble diversity, better predictive performance, and more intelligent modality utilization compared to static strategies
 
-2. HIERARCHICAL FEATURE SAMPLING ABLATION STUDY
-Study Name: Hierarchical_Feature_Sampling_Ablation
+2. FEATURE-LEVEL SAMPLING ABLATION STUDY
+Study Name: Feature_Level_Sampling_Ablation
 Feature Being Tested:
-Hierarchical Feature Sampling - Your novel two-level sampling system that samples both modalities and features within modalities
+Feature-level sampling within modalities - Your novel two-level sampling system that randomly selects subsets of features within each active modality to create intra-modality diversity
 Control (Baseline):
-No Feature Sampling: feature_sampling=False - Only modality-level sampling, no feature-level sampling within modalities
+Full feature utilization - All features within active modalities are used without sampling
 Variables for the Study:
 ablation_variables = [
     # Control group (baseline)
-    {'name': 'No_Feature_Sampling', 'feature_sampling': False},
+    {'name': 'Full_Features', 'feature_sampling_ratio': 1.0},
     
-    # Treatment group (your novel feature)
-    {'name': 'With_Feature_Sampling', 'feature_sampling': True},
-    
-    # Additional feature sampling variants
-    {'name': 'Feature_Sampling_Low_Ratio', 'feature_sampling': True, 'min_feature_ratio': 0.3, 'max_feature_ratio': 0.7},
-    {'name': 'Feature_Sampling_High_Ratio', 'feature_sampling': True, 'min_feature_ratio': 0.7, 'max_feature_ratio': 1.0},
+    # Treatment groups (feature sampling variants)
+    {'name': 'Low_Feature_Sampling', 'feature_sampling_ratio': 0.3},
+    {'name': 'Medium_Feature_Sampling', 'feature_sampling_ratio': 0.5},
+    {'name': 'High_Feature_Sampling', 'feature_sampling_ratio': 0.8},
+    {'name': 'Very_High_Feature_Sampling', 'feature_sampling_ratio': 0.9},
 ]
+Metrics to Compare:
+Feature utilization diversity across bags
+Intra-modality diversity scores
+Predictive performance with reduced features
+Overfitting resistance
+Computational efficiency
+Feature importance stability
+Expected Outcome:
+Feature sampling should improve ensemble diversity and overfitting resistance while maintaining or improving predictive performance
 
-3. REAL-TIME DIVERSITY OPTIMIZATION ABLATION STUDY
-Study Name: Real_Time_Diversity_Optimization_Ablation
+3. COMBINED ADAPTIVE STRATEGY ABLATION STUDY
+Study Name: Combined_Adaptive_Strategy_Ablation
 Feature Being Tested:
-Real-Time Diversity Optimization - Your novel diversity monitoring and optimization system that continuously tracks and optimizes ensemble diversity
+Combined effect of adaptive modality dropout + feature-level sampling - Testing the synergistic impact of both novel features working together
 Control (Baseline):
-No Diversity Optimization: dropout_strategy='random' with fixed diversity_target - No real-time diversity monitoring or optimization
+Static strategies with full feature utilization
 Variables for the Study:
 ablation_variables = [
-    # Control group (baseline)
-    {'name': 'No_Diversity_Optimization', 'dropout_strategy': 'random', 'diversity_target': 0.7},
+    # Control group (static + full features)
+    {'name': 'Linear_Full_Features', 'dropout_strategy': 'linear', 'feature_sampling_ratio': 1.0},
+    {'name': 'Random_Full_Features', 'dropout_strategy': 'random', 'feature_sampling_ratio': 1.0},
     
-    # Treatment group (your novel feature)
-    {'name': 'Diversity_Optimization_Low', 'dropout_strategy': 'adaptive', 'diversity_target': 0.3},
-    {'name': 'Diversity_Optimization_Medium', 'dropout_strategy': 'adaptive', 'diversity_target': 0.5},
-    {'name': 'Diversity_Optimization_High', 'dropout_strategy': 'adaptive', 'diversity_target': 0.7},
-    {'name': 'Diversity_Optimization_Very_High', 'dropout_strategy': 'adaptive', 'diversity_target': 0.9},
+    # Treatment groups (adaptive + feature sampling combinations)
+    {'name': 'Adaptive_Full_Features', 'dropout_strategy': 'adaptive', 'feature_sampling_ratio': 1.0},
+    {'name': 'Adaptive_Feature_Sampling', 'dropout_strategy': 'adaptive', 'feature_sampling_ratio': 0.8},
+    {'name': 'Linear_Feature_Sampling', 'dropout_strategy': 'linear', 'feature_sampling_ratio': 0.8},
+    {'name': 'Random_Feature_Sampling', 'dropout_strategy': 'random', 'feature_sampling_ratio': 0.8},
 ]
-
-4. COMPREHENSIVE NOVEL FEATURES ABLATION STUDY
-Study Name: Comprehensive_Novel_Features_Ablation
-Feature Being Tested:
-All Three Novel Features Combined - Testing the additive effects and interactions between all your novel Stage 2 features
-Control (Baseline):
-No Novel Features: dropout_strategy='random', feature_sampling=False, diversity_target=0.7 - Traditional ensemble generation without any novel features
-Variables for the Study:
-ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Baseline_No_Novel_Features', 'dropout_strategy': 'random', 'feature_sampling': False, 'diversity_target': 0.7},
-    
-    # Individual novel features
-    {'name': 'Adaptive_Only', 'dropout_strategy': 'adaptive', 'feature_sampling': False, 'diversity_target': 0.7},
-    {'name': 'Feature_Sampling_Only', 'dropout_strategy': 'random', 'feature_sampling': True, 'diversity_target': 0.7},
-    {'name': 'Diversity_Optimization_Only', 'dropout_strategy': 'adaptive', 'feature_sampling': False, 'diversity_target': 0.9},
-    
-    # Pairwise combinations
-    {'name': 'Adaptive_Plus_Feature_Sampling', 'dropout_strategy': 'adaptive', 'feature_sampling': True, 'diversity_target': 0.7},
-    {'name': 'Adaptive_Plus_Diversity_Optimization', 'dropout_strategy': 'adaptive', 'feature_sampling': False, 'diversity_target': 0.9},
-    {'name': 'Feature_Sampling_Plus_Diversity_Optimization', 'dropout_strategy': 'random', 'feature_sampling': True, 'diversity_target': 0.9},
-    
-    # All novel features combined
-    {'name': 'All_Novel_Features_Combined', 'dropout_strategy': 'adaptive', 'feature_sampling': True, 'diversity_target': 0.9},
-]
+Metrics to Compare:
+Overall ensemble diversity (modality + feature level)
+Predictive performance across different combinations
+Synergistic effects of both novel features
+Computational efficiency trade-offs
+Robustness to various data conditions
+Expected Outcome:
+The combination of adaptive modality dropout + feature sampling should demonstrate the strongest performance, showing synergistic benefits of both novel features
 
 //Intepretability Tests
 1. Ensemble Diversity Analysis
+Test Name: analyze_ensemble_diversity
+Description: Analyze ensemble diversity patterns in Stage 2 to understand how different dropout strategies and feature sampling affect ensemble composition and diversity
+Implementation:
 def analyze_ensemble_diversity(model):
     """Analyze ensemble diversity patterns in Stage 2"""
-    ensemble_stats = model.get_ensemble_stats(return_detailed=True)
+    ensemble_stats = model.get_ensemble_stats()
+    interpretability_data = model.get_stage2_interpretability_data()
     
-    diversity_metrics = ensemble_stats['diversity_metrics']
+    # Calculate diversity metrics
+    bags = interpretability_data['bags']
+    modality_coverage = ensemble_stats['modality_coverage']
+    dropout_statistics = ensemble_stats['dropout_statistics']
+    
+    # Compute Hamming distance between modality masks
+    diversity_scores = []
+    for i in range(len(bags)):
+        for j in range(i+1, len(bags)):
+            bag_i_mask = bags[i]['modality_mask']
+            bag_j_mask = bags[j]['modality_mask']
+            hamming_dist = sum(1 for k in bag_i_mask if bag_i_mask[k] != bag_j_mask[k])
+            diversity_scores.append(hamming_dist)
     
     return {
-        'ensemble_diversity': diversity_metrics['ensemble_diversity'],
-        'mean_bag_diversity': diversity_metrics['mean_bag_diversity'],
-        'std_bag_diversity': diversity_metrics['std_bag_diversity'],
-        'diversity_distribution': diversity_metrics
+        'ensemble_diversity': np.mean(diversity_scores),
+        'mean_bag_diversity': np.mean(diversity_scores),
+        'std_bag_diversity': np.std(diversity_scores),
+        'diversity_distribution': diversity_scores,
+        'modality_coverage': modality_coverage,
+        'dropout_statistics': dropout_statistics
     }
 Interpretability Questions:
 How diverse is the ensemble across all bags?
 What's the variance in diversity across bags?
 How does diversity change with different dropout strategies?
-
-2. Modality Coverage Analysis
-def analyze_modality_coverage(model):
-    """Analyze which modalities are covered across ensemble bags"""
-    ensemble_stats = model.get_ensemble_stats(return_detailed=True)
-    
-    modality_coverage = ensemble_stats['modality_coverage']
-    
-    return {
-        'modality_coverage': modality_coverage,
-        'coverage_variance': np.var(list(modality_coverage.values())),
-        'most_covered_modality': max(modality_coverage, key=modality_coverage.get),
-        'least_covered_modality': min(modality_coverage, key=modality_coverage.get)
-    }
-Interpretability Questions:
 Which modalities are most/least frequently used?
-How balanced is the modality coverage?
-Are there any modalities that are consistently dropped?
 
-3. Dropout Rate Distribution Analysis
-def analyze_dropout_rate_distribution(model):
-    """Analyze dropout rate patterns across ensemble bags"""
-    ensemble_stats = model.get_ensemble_stats(return_detailed=True)
+2. Modality Importance Analysis
+Test Name: analyze_modality_importance
+Description: Analyze how the adaptive strategy computes and utilizes modality importance scores, and how this affects ensemble composition
+Implementation:
+def analyze_modality_importance(model):
+    """Analyze modality importance computation and utilization"""
+    interpretability_data = model.get_stage2_interpretability_data()
+    bags = interpretability_data['bags']
     
-    dropout_statistics = ensemble_stats['dropout_statistics']
+    # Extract modality importance patterns
+    modality_usage = {}
+    dropout_rates = []
+    
+    for bag in bags:
+        for modality, is_active in bag['modality_mask'].items():
+            if modality not in modality_usage:
+                modality_usage[modality] = {'active': 0, 'total': 0}
+            modality_usage[modality]['total'] += 1
+            if is_active:
+                modality_usage[modality]['active'] += 1
+        dropout_rates.append(bag['dropout_rate'])
+    
+    # Calculate importance scores
+    importance_scores = {}
+    for modality, usage in modality_usage.items():
+        importance_scores[modality] = usage['active'] / usage['total']
     
     return {
-        'mean_dropout_rate': dropout_statistics['mean_dropout_rate'],
-        'min_dropout_rate': dropout_statistics['min_dropout_rate'],
-        'max_dropout_rate': dropout_statistics['max_dropout_rate'],
-        'dropout_variance': np.var([bag['dropout_rate'] for bag in ensemble_stats['bags']])
+        'modality_importance_scores': importance_scores,
+        'modality_usage_patterns': modality_usage,
+        'dropout_rate_distribution': dropout_rates,
+        'importance_variance': np.var(list(importance_scores.values()))
     }
 Interpretability Questions:
-How does dropout rate vary across bags?
-What's the distribution of dropout rates?
-How does adaptive strategy affect dropout rate distribution?
+How does the adaptive strategy rank modality importance?
+Which modalities are retained most frequently?
+How consistent are importance scores across bags?
+Does importance ranking match expected data characteristics?
 
-4. Bag Configuration Analysis
-def analyze_bag_configurations(model):
-    """Analyze individual bag configurations and patterns"""
-    ensemble_stats = model.get_ensemble_stats(return_detailed=True)
+3. Feature Selection Analysis
+Test Name: analyze_feature_selection
+Description: Analyze feature-level sampling patterns to understand how features are selected within each modality and their impact on ensemble diversity
+Implementation:
+def analyze_feature_selection(model):
+    """Analyze feature selection patterns within modalities"""
+    interpretability_data = model.get_stage2_interpretability_data()
+    bags = interpretability_data['bags']
     
-    bag_configs = ensemble_stats['bags']
+    # Analyze feature selection patterns
+    feature_selection_stats = {}
     
-    # Analyze modality patterns
-    modality_patterns = {}
-    for bag in bag_configs:
-        pattern = tuple(sorted(bag['modalities']))
-        if pattern not in modality_patterns:
-            modality_patterns[pattern] = 0
-        modality_patterns[pattern] += 1
+    for bag in bags:
+        for modality, feature_mask in bag['feature_mask'].items():
+            if modality not in feature_selection_stats:
+                feature_selection_stats[modality] = {
+                    'total_features': len(feature_mask),
+                    'selected_features': [],
+                    'selection_ratios': []
+                }
+            
+            selected_count = np.sum(feature_mask)
+            selection_ratio = selected_count / len(feature_mask)
+            
+            feature_selection_stats[modality]['selected_features'].append(selected_count)
+            feature_selection_stats[modality]['selection_ratios'].append(selection_ratio)
+    
+    # Calculate statistics
+    for modality in feature_selection_stats:
+        stats = feature_selection_stats[modality]
+        stats['mean_selection_ratio'] = np.mean(stats['selection_ratios'])
+        stats['std_selection_ratio'] = np.std(stats['selection_ratios'])
+        stats['min_selection_ratio'] = np.min(stats['selection_ratios'])
+        stats['max_selection_ratio'] = np.max(stats['selection_ratios'])
     
     return {
-        'bag_configurations': bag_configs,
-        'modality_patterns': modality_patterns,
-        'unique_patterns': len(modality_patterns),
-        'pattern_frequency': modality_patterns
-    }
-Interpretability Questions:
-What are the most common modality patterns?
-How many unique modality combinations exist?
-Are there any rare or common modality patterns?
-
-5. Feature Sampling Analysis
-def analyze_feature_sampling(model):
-    """Analyze feature sampling patterns within modalities"""
-    ensemble_stats = model.get_ensemble_stats(return_detailed=True)
-    
-    bag_configs = ensemble_stats['bags']
-    
-    # Analyze feature sampling ratios
-    feature_sampling_ratios = {}
-    for bag in bag_configs:
-        for modality, ratio in bag.get('feature_sampling_info', {}).items():
-            if modality not in feature_sampling_ratios:
-                feature_sampling_ratios[modality] = []
-            feature_sampling_ratios[modality].append(ratio['sampling_ratio'])
-    
-    return {
-        'feature_sampling_ratios': feature_sampling_ratios,
-        'mean_sampling_ratios': {mod: np.mean(ratios) for mod, ratios in feature_sampling_ratios.items()},
-        'sampling_variance': {mod: np.var(ratios) for mod, ratios in feature_sampling_ratios.items()}
-    }
-Interpretability Questions:
-How much feature sampling occurs within each modality?
-What's the variance in feature sampling across bags?
-Which modalities have the most/least feature sampling?
-
-6. Adaptive Strategy Behavior Analysis
-def analyze_adaptive_strategy_behavior(model):
-    """Analyze how adaptive dropout strategy behaves"""
-    ensemble_stats = model.get_ensemble_stats(return_detailed=True)
-    
-    bag_configs = ensemble_stats['bags']
-    
-    # Analyze dropout rate progression
-    dropout_rates = [bag['dropout_rate'] for bag in bag_configs]
-    dropout_progression = np.array(dropout_rates)
-    
-    # Analyze diversity progression
-    diversity_scores = [bag['diversity_score'] for bag in bag_configs]
-    diversity_progression = np.array(diversity_scores)
-    
-    return {
-        'dropout_rate_progression': dropout_progression,
-        'diversity_progression': diversity_progression,
-        'dropout_diversity_correlation': np.corrcoef(dropout_progression, diversity_progression)[0, 1],
-        'adaptive_behavior': {
-            'dropout_trend': 'increasing' if dropout_progression[-1] > dropout_progression[0] else 'decreasing',
-            'diversity_trend': 'increasing' if diversity_progression[-1] > diversity_progression[0] else 'decreasing'
+        'feature_selection_statistics': feature_selection_stats,
+        'overall_feature_diversity': {
+            mod: stats['std_selection_ratio'] for mod, stats in feature_selection_stats.items()
         }
     }
 Interpretability Questions:
-How does dropout rate change as bags are generated?
-How does diversity change as bags are generated?
-Is there a correlation between dropout rate and diversity?
-Does the adaptive strategy achieve its target diversity?
+How many features are typically selected per modality?
+What's the variance in feature selection across bags?
+Are certain features consistently selected or avoided?
+How does feature sampling ratio affect selection patterns?
 
-7. Bootstrap Sampling Analysis
-def analyze_bootstrap_sampling(model):
-    """Analyze bootstrap sampling patterns across bags"""
-    ensemble_stats = model.get_ensemble_stats(return_detailed=True)
+4. Dropout Strategy Comparison
+Test Name: compare_dropout_strategies
+Description: Compare the effectiveness of different dropout strategies (linear, exponential, random, adaptive) in terms of diversity, modality utilization, and ensemble composition
+Implementation:
+def compare_dropout_strategies(models_dict):
+    """Compare different dropout strategies across multiple models"""
+    comparison_results = {}
     
-    bag_configs = ensemble_stats['bags']
-    
-    # Analyze sample counts
-    sample_counts = [bag['sample_count'] for bag in bag_configs]
+    for strategy_name, model in models_dict.items():
+        ensemble_stats = model.get_ensemble_stats()
+        interpretability_data = model.get_stage2_interpretability_data()
+        
+        # Extract key metrics
+        bags = interpretability_data['bags']
+        modality_coverage = ensemble_stats['modality_coverage']
+        dropout_stats = ensemble_stats['dropout_statistics']
+        
+        # Calculate strategy-specific metrics
+        dropout_rates = [bag['dropout_rate'] for bag in bags]
+        modality_usage = {}
+        
+        for bag in bags:
+            for modality, is_active in bag['modality_mask'].items():
+                if modality not in modality_usage:
+                    modality_usage[modality] = 0
+                if is_active:
+                    modality_usage[modality] += 1
+        
+        comparison_results[strategy_name] = {
+            'mean_dropout_rate': np.mean(dropout_rates),
+            'std_dropout_rate': np.std(dropout_rates),
+            'modality_usage': modality_usage,
+            'modality_coverage': modality_coverage,
+            'strategy': ensemble_stats['strategy']
+        }
     
     return {
-        'sample_counts': sample_counts,
-        'mean_sample_count': np.mean(sample_counts),
-        'sample_count_variance': np.var(sample_counts),
-        'sample_count_range': [min(sample_counts), max(sample_counts)]
+        'strategy_comparison': comparison_results,
+        'best_diversity_strategy': max(comparison_results.keys(), 
+                                     key=lambda x: comparison_results[x]['modality_coverage']),
+        'most_balanced_strategy': min(comparison_results.keys(),
+                                    key=lambda x: comparison_results[x]['std_dropout_rate'])
     }
 Interpretability Questions:
-How consistent are sample counts across bags?
-What's the variance in bootstrap sampling?
-How does sample ratio affect bag diversity?
+Which dropout strategy produces the most diverse ensemble?
+How do dropout rates vary across different strategies?
+Which strategy provides the most balanced modality utilization?
+How does the adaptive strategy compare to static strategies?
 
-Complete Stage 2 Interpretability Analysis
-def comprehensive_stage2_interpretability_study(model):
-    """Comprehensive interpretability analysis for Stage 2 only"""
+5. Bootstrap Sampling Analysis
+Test Name: analyze_bootstrap_sampling
+Description: Analyze bootstrap sampling patterns to understand how data is distributed across bags and identify potential sampling biases
+Implementation:
+def analyze_bootstrap_sampling(model):
+    """Analyze bootstrap sampling patterns and data distribution"""
+    interpretability_data = model.get_stage2_interpretability_data()
+    bags = interpretability_data['bags']
     
-    results = {}
+    # Analyze sampling patterns
+    sample_counts = []
+    sample_overlap = []
+    unique_samples = set()
     
-    # 1. Ensemble diversity analysis
-    results['ensemble_diversity'] = analyze_ensemble_diversity(model)
+    for bag in bags:
+        sample_count = len(bag['data_indices'])
+        sample_counts.append(sample_count)
+        unique_samples.update(bag['data_indices'])
     
-    # 2. Modality coverage analysis
-    results['modality_coverage'] = analyze_modality_coverage(model)
+    # Calculate overlap between bags
+    for i in range(len(bags)):
+        for j in range(i+1, len(bags)):
+            overlap = len(set(bags[i]['data_indices']) & set(bags[j]['data_indices']))
+            sample_overlap.append(overlap)
     
-    # 3. Dropout rate distribution analysis
-    results['dropout_distribution'] = analyze_dropout_rate_distribution(model)
-    
-    # 4. Bag configuration analysis
-    results['bag_configurations'] = analyze_bag_configurations(model)
-    
-    # 5. Feature sampling analysis
-    results['feature_sampling'] = analyze_feature_sampling(model)
-    
-    # 6. Adaptive strategy behavior analysis
-    results['adaptive_behavior'] = analyze_adaptive_strategy_behavior(model)
-    
-    # 7. Bootstrap sampling analysis
-    results['bootstrap_sampling'] = analyze_bootstrap_sampling(model)
-    
-    return results
+    return {
+        'sample_count_distribution': {
+            'mean': np.mean(sample_counts),
+            'std': np.std(sample_counts),
+            'min': np.min(sample_counts),
+            'max': np.max(sample_counts)
+        },
+        'sample_overlap_statistics': {
+            'mean_overlap': np.mean(sample_overlap),
+            'std_overlap': np.std(sample_overlap),
+            'max_overlap': np.max(sample_overlap)
+        },
+        'unique_sample_coverage': len(unique_samples),
+        'total_samples': len(bags[0]['data_indices']) if bags else 0
+    }
+Interpretability Questions:
+How evenly are samples distributed across bags?
+What's the overlap between different bags?
+Are there any sampling biases or patterns?
+How does sample ratio affect data coverage?
 
 //Robustness Tests
 1. Modality Dropout Robustness
-Purpose: Test how well the ensemble generation handles different dropout scenarios
-Tests:
+Test Name: test_modality_dropout_robustness
+Description: Test how well the ensemble generation handles different dropout scenarios including missing modalities, partial modality availability, and extreme dropout rates
+Implementation:
+def test_modality_dropout_robustness(model, test_scenarios):
+    """Test robustness to different modality dropout scenarios."""
+    results = {}
+    
+    for scenario_name, scenario_config in test_scenarios.items():
+        # Create modified model with specific dropout configuration
+        test_model = MultiModalEnsembleModel(
+            n_bags=model.n_bags,
+            dropout_strategy=scenario_config.get('dropout_strategy', 'adaptive'),
+            max_dropout_rate=scenario_config.get('max_dropout_rate', 0.5),
+            feature_sampling_ratio=model.feature_sampling_ratio,
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        # Test with scenario-specific configuration
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Collect robustness metrics
+        ensemble_stats = test_model.get_ensemble_statistics()
+        modality_importance = test_model.get_modality_importance()
+        feature_stats = test_model.get_feature_statistics()
+        
+        results[scenario_name] = {
+            'ensemble_stats': ensemble_stats,
+            'modality_importance': modality_importance,
+            'feature_stats': feature_stats,
+            'robustness_score': calculate_robustness_score(ensemble_stats, modality_importance)
+        }
+    
+    return results
+Test Scenarios:
 Missing Modality Robustness: Test with 1, 2, or all modalities missing
 Partial Modality Robustness: Test with reduced feature dimensions per modality
 Dropout Rate Sensitivity: Test with extreme dropout rates (0.1, 0.5, 0.9)
 Dropout Strategy Robustness: Compare performance across different dropout strategies
-dropout_robustness_tests = {
-    'missing_modalities': [
-        {'text': False, 'image': True, 'audio': True},  # Missing text
-        {'text': True, 'image': False, 'audio': True},  # Missing image
-        {'text': True, 'image': True, 'audio': False},  # Missing audio
-        {'text': False, 'image': False, 'audio': True}, # Missing 2 modalities
-    ],
-    'extreme_dropout_rates': [0.1, 0.3, 0.5, 0.7, 0.9],
-    'dropout_strategies': ['linear', 'exponential', 'random', 'adaptive']
-}
+Robustness Questions:
+How does the ensemble handle missing modalities?
+What's the impact of extreme dropout rates on ensemble diversity?
+Which dropout strategy is most robust to missing data?
+How does feature sampling affect robustness to partial modality availability?
 
-2. Ensemble Size Robustness
-Purpose: Test how performance scales with different ensemble sizes
-Tests:
-Small Ensemble Robustness: Test with 3, 5, 8 bags
-Large Ensemble Robustness: Test with 15, 20, 30 bags
-Ensemble Size vs Performance: Find optimal ensemble size
-Computational Efficiency: Measure training time vs ensemble size
+2. Feature Sampling Robustness
+Test Name: test_feature_sampling_robustness
+Description: Test robustness of the feature-level sampling mechanism under different sampling ratios and feature availability scenarios
+Implementation:
+def test_feature_sampling_robustness(model, sampling_scenarios):
+    """Test robustness of feature sampling under different conditions."""
+    results = {}
+    
+    for scenario_name, sampling_ratio in sampling_scenarios.items():
+        # Create model with specific feature sampling ratio
+        test_model = MultiModalEnsembleModel(
+            n_bags=model.n_bags,
+            dropout_strategy=model.dropout_strategy,
+            max_dropout_rate=model.max_dropout_rate,
+            feature_sampling_ratio=sampling_ratio,
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze feature selection patterns
+        feature_stats = test_model.get_feature_statistics()
+        interpretability_data = test_model.get_stage2_interpretability_data()
+        
+        # Calculate feature diversity metrics
+        feature_diversity = calculate_feature_diversity(interpretability_data)
+        
+        results[scenario_name] = {
+            'sampling_ratio': sampling_ratio,
+            'feature_stats': feature_stats,
+            'feature_diversity': feature_diversity,
+            'robustness_metrics': {
+                'selection_consistency': calculate_selection_consistency(feature_stats),
+                'diversity_stability': calculate_diversity_stability(feature_diversity)
+            }
+        }
+    
+    return results
+Test Scenarios:
+Low Feature Sampling (0.1, 0.3): Test with minimal feature selection
+Medium Feature Sampling (0.5, 0.7): Test with moderate feature selection
+High Feature Sampling (0.9, 1.0): Test with near-complete feature selection
+Variable Feature Sampling: Test with different ratios per modality
+Robustness Questions:
+How does feature sampling ratio affect ensemble stability?
+What's the minimum feature sampling ratio for robust performance?
+Are there optimal feature sampling ratios for different modalities?
+How does feature diversity change with sampling ratios?
 
-3. Feature Sampling Robustness
-Purpose: Test robustness to different feature sampling scenarios
-Tests:
-Feature Ratio Robustness: Test with different feature sampling ratios (0.3, 0.5, 0.7, 0.9)
-Feature Sampling Disabled: Compare with/without feature sampling
-Extreme Feature Sampling: Test with very low feature ratios (0.1, 0.2)
-Modality-Specific Feature Sampling: Different sampling ratios per modality
+3. Bootstrap Sampling Robustness
+Test Name: test_bootstrap_sampling_robustness
+Description: Test robustness of bootstrap sampling under different sample ratios and data distribution scenarios
+Implementation:
+def test_bootstrap_sampling_robustness(model, sampling_scenarios):
+    """Test robustness of bootstrap sampling mechanisms."""
+    results = {}
+    
+    for scenario_name, sample_ratio in sampling_scenarios.items():
+        # Create model with specific sample ratio
+        test_model = MultiModalEnsembleModel(
+            n_bags=model.n_bags,
+            dropout_strategy=model.dropout_strategy,
+            max_dropout_rate=model.max_dropout_rate,
+            feature_sampling_ratio=model.feature_sampling_ratio,
+            sample_ratio=sample_ratio,
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze bootstrap sampling patterns
+        interpretability_data = test_model.get_stage2_interpretability_data()
+        detailed_bags = interpretability_data['detailed_bags']
+        
+        # Calculate sampling robustness metrics
+        sampling_metrics = calculate_sampling_robustness(detailed_bags)
+        
+        results[scenario_name] = {
+            'sample_ratio': sample_ratio,
+            'sampling_metrics': sampling_metrics,
+            'data_coverage': calculate_data_coverage(detailed_bags),
+            'robustness_score': calculate_sampling_robustness_score(sampling_metrics)
+        }
+    
+    return results
+Test Scenarios:
+Low Sample Ratios (0.3, 0.5): Test with minimal data sampling
+Medium Sample Ratios (0.7, 0.8): Test with standard data sampling
+High Sample Ratios (0.9, 1.0): Test with near-complete data sampling
+Variable Sample Ratios: Test with different ratios across bags
+Robustness Questions:
+How does sample ratio affect data coverage across bags?
+What's the minimum sample ratio for robust ensemble generation?
+How does bootstrap sampling handle class imbalance?
+Are there optimal sample ratios for different data sizes?
 
-4. Diversity Target Robustness
-Purpose: Test how different diversity targets affect ensemble performance
-Tests:
-Diversity Target Range: Test with 0.3, 0.5, 0.7, 0.9 diversity targets
-Diversity vs Performance Trade-off: Find optimal diversity-performance balance
-Diversity Convergence: Test if diversity targets are actually achieved
+4. Ensemble Size Robustness
+Test Name: test_ensemble_size_robustness
+Description: Test robustness of ensemble generation with different numbers of bags and ensemble sizes
+Implementation:
+def test_ensemble_size_robustness(model, ensemble_sizes):
+    """Test robustness with different ensemble sizes."""
+    results = {}
+    
+    for scenario_name, n_bags in ensemble_sizes.items():
+        # Create model with specific ensemble size
+        test_model = MultiModalEnsembleModel(
+            n_bags=n_bags,
+            dropout_strategy=model.dropout_strategy,
+            max_dropout_rate=model.max_dropout_rate,
+            feature_sampling_ratio=model.feature_sampling_ratio,
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze ensemble size effects
+        ensemble_stats = test_model.get_ensemble_statistics()
+        interpretability_data = test_model.get_stage2_interpretability_data()
+        
+        # Calculate ensemble diversity and stability
+        ensemble_diversity = calculate_ensemble_diversity(interpretability_data)
+        ensemble_stability = calculate_ensemble_stability(ensemble_stats)
+        
+        results[scenario_name] = {
+            'n_bags': n_bags,
+            'ensemble_stats': ensemble_stats,
+            'ensemble_diversity': ensemble_diversity,
+            'ensemble_stability': ensemble_stability,
+            'robustness_metrics': {
+                'diversity_scaling': calculate_diversity_scaling(ensemble_diversity, n_bags),
+                'stability_trend': calculate_stability_trend(ensemble_stability, n_bags)
+            }
+        }
+    
+    return results
+Test Scenarios:
+Small Ensembles (3, 5 bags): Test with minimal ensemble size
+Medium Ensembles (10, 15 bags): Test with standard ensemble size
+Large Ensembles (25, 50 bags): Test with large ensemble size
+Variable Ensemble Sizes: Test with different sizes across runs
+Robustness Questions:
+How does ensemble size affect diversity and stability?
+What's the minimum ensemble size for robust performance?
+Are there diminishing returns with larger ensembles?
+How does ensemble size interact with dropout strategies?
 
-5. Bootstrap Sampling Robustness
-Purpose: Test robustness to different bootstrap sampling scenarios
-Tests:
-Sample Ratio Robustness: Test with 0.5, 0.7, 0.8, 0.9, 1.0 sample ratios
-Bootstrap vs No Bootstrap: Compare with/without bootstrap sampling
-Small Dataset Robustness: Test with very small datasets (50, 100 samples)
-Large Dataset Robustness: Test with large datasets (1000+ samples)
-
-6. Modality Configuration Robustness
-Purpose: Test robustness to different modality configurations
-Tests:
-Modality Count Robustness: Test with 2, 3, 4, 5 modalities
-Modality Balance Robustness: Test with balanced vs imbalanced modality sizes
-Modality Quality Robustness: Test with high vs low quality modalities
-Modality Correlation Robustness: Test with correlated vs independent modalities
-
-7. Random Seed Robustness
-Purpose: Test stability across different random seeds
-Tests:
-Seed Stability: Test with 10+ different random seeds
-Reproducibility: Verify results are consistent across seeds
-Seed Sensitivity: Measure variance in performance across seeds
-
-8. Data Quality Robustness
-Purpose: Test robustness to different data quality scenarios
-Tests:
-Noise Robustness: Test with different noise levels (0%, 5%, 10%, 20%)
-Outlier Robustness: Test with different outlier percentages
-Missing Data Robustness: Test with different missing data patterns
+5. Adaptive Strategy Robustness
+Test Name: test_adaptive_strategy_robustness
+Description: Test robustness of the novel adaptive dropout strategy under different data conditions and parameter settings
+Implementation:
+def test_adaptive_strategy_robustness(model, adaptive_scenarios):
+    """Test robustness of the adaptive dropout strategy."""
+    results = {}
+    
+    for scenario_name, scenario_config in adaptive_scenarios.items():
+        # Create model with adaptive strategy and specific parameters
+        test_model = MultiModalEnsembleModel(
+            n_bags=model.n_bags,
+            dropout_strategy='adaptive',
+            max_dropout_rate=scenario_config.get('max_dropout_rate', 0.5),
+            feature_sampling_ratio=scenario_config.get('feature_sampling_ratio', 0.8),
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze adaptive strategy performance
+        modality_importance = test_model.get_modality_importance()
+        ensemble_stats = test_model.get_ensemble_statistics()
+        interpretability_data = test_model.get_stage2_interpretability_data()
+        
+        # Calculate adaptive strategy robustness metrics
+        adaptive_metrics = calculate_adaptive_robustness(
+            modality_importance, ensemble_stats, interpretability_data
+        )
+        
+        results[scenario_name] = {
+            'scenario_config': scenario_config,
+            'modality_importance': modality_importance,
+            'ensemble_stats': ensemble_stats,
+            'adaptive_metrics': adaptive_metrics,
+            'robustness_score': calculate_adaptive_robustness_score(adaptive_metrics)
+        }
+    
+    return results
+Test Scenarios:
+Adaptive Parameter Sensitivity: Test with different max_dropout_rate values
+Feature Sampling Integration: Test adaptive strategy with different feature_sampling_ratio
 Data Distribution Robustness: Test with different data distributions
+Modality Importance Stability: Test consistency of importance calculations
+Robustness Questions:
+How robust is the adaptive strategy to parameter changes?
+Does the adaptive strategy maintain performance across different data conditions?
+How consistent are modality importance calculations?
+What's the impact of feature sampling on adaptive strategy robustness?
 
 Stage 3:
 
 //summary
-Stage 3 is the intelligent base learner selection and configuration phase that takes the diverse ensemble bags generated in Stage 2 and assigns optimal base learners to each bag based on the specific characteristics of the data within each bag. This stage analyzes the modality patterns, data complexity, and task requirements to make informed decisions about which machine learning algorithms will work best for each bag's unique data configuration.
-The process begins by examining each bag's modality mask and feature sampling patterns to understand what types of data are available. For example, a bag with only text and image modalities will be assigned different learners than a bag with all three modalities (text, image, audio). The system then considers the task type (classification vs regression) and the specified optimization strategy (accuracy, memory, speed, or balanced) to select appropriate base learners from a comprehensive library that includes both PyTorch neural networks and scikit-learn algorithms.
-The selection process is modality-aware, meaning it takes into account the specific combinations of modalities present in each bag. Bags with high-dimensional modalities like images might get neural network learners, while bags with tabular-style data might get traditional ML algorithms like Random Forest or SVM. The system also considers performance thresholds and validation strategies to ensure that only high-quality learners are selected. Once the optimal learners are chosen, they are configured with appropriate hyperparameters and prepared for the training phase in Stage 4, creating a diverse and specialized ensemble where each base learner is perfectly suited to its assigned data bag.
+Stage 3 begins with Initialization & Configuration where the BaseLearnerSelector class is instantiated with task type (classification/regression), optimization mode (accuracy/performance/efficiency), number of classes, and random state parameters, establishing the foundation for intelligent learner selection. The Bag Data Processing step receives saved bags from Stage 2 with their sampled training data and labels, accessing bag data through bagger.get_bag_data() to retrieve modality-specific data and labels for each bag, ensuring complete data availability for analysis. Modality Weightage Analysis implements the _analyze_modality_weightage() function that calculates the importance of each modality within each bag by analyzing feature selection ratios (how many features are selected), data variance (importance of the data), and dimensionality (size of the modality), then normalizes these weights to sum to 1.0, providing quantitative measures of modality importance per bag. Learner Type Selection uses the _select_learner_type() function to intelligently assign learner types based on bag characteristics, mapping single modalities to modality-specific learners (text→text_learner, image→image_learner, tabular→tabular_learner), two modalities to simple fusion learners, and multiple modalities to advanced fusion learners, ensuring optimal learner selection for each bag's composition. Learner Configuration implements the _configure_learner() function that customizes learner parameters based on the selected optimization mode, with accuracy mode using high complexity (200 estimators, depth 20, early stopping), performance mode using medium complexity (100 estimators, depth 10), and efficiency mode using low complexity (50 estimators, depth 5), while also adding modality-specific configurations for different learner types. Performance Prediction uses the _predict_performance() function to estimate expected performance for each bag-learner combination by calculating base performance (0.6) plus bonuses for modality diversity, weightage, learner type, and optimization mode, minus penalties for dropout rates, providing performance scores between 0.0 and 1.0. Bag-Learner Configuration Creation generates BagLearnerConfig dataclass objects that store complete bag information including bag ID, sampled training data and labels, modality and feature masks, assigned learner type and configuration, modality weights, optimization mode, task type, and expected performance, creating comprehensive configurations for each bag. Storage & Management stores all bag-learner configurations in self.bag_learner_configs list, providing methods like get_bag_learner_summary() for overall statistics, get_bag_learner_config(bag_id) for individual bag configurations, and get_stage3_interpretability_data() for comprehensive analysis data, enabling easy access to all Stage 3 results. Finally, API Integration seamlessly integrates Stage 3 into the main pipeline through the _select_base_learners() method, automatically running after Stage 2 completion, with all Stage 3 functionality accessible through the unified API, ensuring smooth data flow from Stage 2 bag generation to Stage 3 learner selection, with complete bag data, assigned learners, and configuration metadata ready for Stage 4 training.
 
 //novel features
-1. Modality-Aware Weak Learner Selector ✅
-What it does: Automatically selects optimal base learners based on the specific modality patterns present in each bag
-Why it's novel: Traditional ensemble methods use the same learner type for all bags, but this adapts learner selection to the unique modality composition of each bag
-Implementation: Analyzes modality patterns (text-only, image-only, multimodal, etc.) and selects appropriate learners (neural networks for complex patterns, tree-based for structured data, etc.)
-2. Adaptive Optimization Strategy Selection ✅
-What it does: Dynamically adjusts learner selection based on optimization goals (accuracy, speed, memory, balanced)
-Why it's novel: Most ensemble methods focus only on accuracy, but this considers the full optimization landscape
-Implementation: Balances performance vs efficiency based on the specified optimization strategy
-3. Cross-Modal Learner Compatibility Analysis ✅
-What it does: Evaluates how well different learner types work with specific modality combinations
-Why it's novel: Traditional methods don't consider modality-learner compatibility
-Implementation: Uses compatibility matrices to ensure selected learners are optimal for the specific modality patterns in each bag
-4. Dynamic Performance Thresholding ✅
-What it does: Adapts the minimum performance threshold based on bag complexity and modality patterns
-Why it's novel: Static thresholds don't account for varying complexity across different modality combinations
-Implementation: Adjusts thresholds based on bag characteristics (number of modalities, data complexity, etc.)
-5. Learner Diversity Optimization ✅
-What it does: Ensures selected learners provide complementary strengths across the ensemble
-Why it's novel: Prevents selection of similar learners that would reduce ensemble diversity
-Implementation: Uses diversity metrics to select learners that complement each other
-6. Modality-Specific Hyperparameter Presets ✅
-What it does: Automatically configures learner hyperparameters based on modality characteristics
-Why it's novel: Different modalities require different hyperparameter settings, which this handles automatically
-Implementation: Applies modality-specific hyperparameter presets (e.g., different learning rates for text vs image data)
-7. Real-Time Learner Performance Prediction ✅
-What it does: Predicts learner performance before training based on bag characteristics
-Why it's novel: Avoids training learners that are likely to perform poorly
-Implementation: Uses lightweight performance prediction models to estimate learner suitability
-8. Adaptive Learner Redundancy Management ✅
-What it does: Dynamically manages learner redundancy to prevent overfitting while maintaining diversity
-Why it's novel: Balances the trade-off between ensemble diversity and redundancy
-Implementation: Monitors learner similarity and adjusts selection to maintain optimal redundancy levels
+Stage 3 represents a completely novel approach to ensemble learning that fundamentally transforms how base learners are selected and configured in multimodal ensemble systems. Unlike traditional ensemble methods that use identical learners for all bags or select learners based on performance metrics, this stage introduces intelligent modality-aware learner selection that analyzes the specific composition and characteristics of each bag to assign optimal learners. The novel feature begins with modality weightage analysis that quantifies the importance and contribution of each modality within each individual bag by calculating feature selection ratios, data variance, and dimensionality, then normalizes these weights to create a comprehensive understanding of how different modalities contribute to each bag's learning potential. This weightage analysis enables bag-specific learner type selection where the system intelligently maps modality combinations to optimal learner architectures, assigning single-modality learners for bags with one dominant modality, simple fusion learners for two-modality combinations, and advanced fusion learners for complex multi-modality scenarios, ensuring each bag receives a learner specifically designed for its data characteristics. The system further incorporates optimization mode integration that customizes learner configurations based on performance goals, with accuracy mode prioritizing complex models with high capacity, performance mode balancing complexity and speed, and efficiency mode focusing on fast, lightweight models, allowing the same modality analysis to produce different learner configurations based on deployment requirements. Complete bag-learner pairing stores each bag with its sampled training data, labels, assigned learner configuration, modality weights, and performance predictions in unified BagLearnerConfig objects, creating a comprehensive mapping between data characteristics and optimal learning strategies. This novel approach represents the first documented method that combines modality analysis, bag-specific learner selection, optimization mode integration, and complete configuration storage, creating an intelligent system that adapts its learning strategy to the specific characteristics of each bag's data composition, fundamentally advancing ensemble learning from static, one-size-fits-all approaches to dynamic, modality-aware, bag-specific learner selection that maximizes the potential of each individual bag within the ensemble.
 
 //hyperparameters
-epochs
-Description: Number of training epochs for each base learner - controls training duration and convergence
-Range: [10, 20, 50, 100, 200]
-Default: 100
-Testing: VARY - Key parameter for training duration optimization
-batch_size
-Description: Training batch size for gradient updates - affects training stability and memory usage
-Range: [16, 32, 64, 128, 256]
-Default: 32
-Testing: VARY - Affects training efficiency and convergence
-learning_rate
-Description: Initial learning rate for optimizer - controls training speed and convergence quality
-Range: [1e-4, 1e-3, 1e-2, 5e-2]
-Default: 1e-3
-Testing: FIXED - Keep 1e-3 for stable training
-weight_decay
-Description: L2 regularization weight for preventing overfitting
-Range: [1e-5, 1e-4, 1e-3]
-Default: 1e-4
-Testing: FIXED - Keep 1e-4 for standard regularization
-🎯 OPTIMIZATION STRATEGY HYPERPARAMETERS
-optimizer_type
-Description: Optimizer algorithm for gradient updates - affects convergence speed and stability
-Range: ['adamw', 'adam', 'sgd', 'rmsprop']
-Default: 'adamw'
-Testing: VARY - Key parameter for optimization strategy
-scheduler_type
-Description: Learning rate scheduling strategy - controls learning rate adaptation during training
-Range: ['cosine_restarts', 'onecycle', 'plateau', 'step', 'none']
-Default: 'cosine_restarts'
-Testing: VARY - Affects training convergence patterns
-gradient_clipping
-Description: Gradient clipping threshold for training stability - prevents exploding gradients
-Range: [0.5, 1.0, 2.0, 5.0]
-Default: 1.0
-Testing: FIXED - Keep 1.0 for stable training
-�� CROSS-MODAL DENOISING HYPERPARAMETERS
-enable_denoising
-Description: Enables cross-modal denoising system - your novel feature for multimodal representation learning
+🎯 CORE LEARNER SELECTION HYPERPARAMETERS
+1. task_type
+Description: Task type for learner selection - determines whether to use classification or regression learners
+Range: ['classification', 'regression']
+Default: 'classification'
+Testing: FIXED - Determined by data analysis
+2. optimization_mode
+Description: Optimization strategy for learner configuration - controls complexity and performance trade-offs
+Range: ['accuracy', 'performance', 'efficiency']
+Default: 'accuracy'
+Testing: VARY - Key parameter for learner selection strategy
+3. n_classes
+Description: Number of classes for classification tasks - affects learner architecture selection
+Range: [2, 3, 4, 5, 10, 20, 50, 100]
+Default: 2
+Testing: FIXED - Determined by data analysis
+🎯 ABLATION STUDY HYPERPARAMETERS
+4. modality_aware
+Description: Enable modality-aware learner selection - your novel feature vs fixed selection
 Range: [True, False]
 Default: True
-Testing: FIXED - Always True (your novel feature)
-denoising_weight
-Description: Weight for cross-modal denoising loss - controls balance between main task and denoising objectives
-Range: [0.05, 0.1, 0.2, 0.3, 0.5]
+Testing: VARY - Key parameter for ablation studies
+5. bag_learner_pairing
+Description: Enable complete bag-learner pairing storage vs separate storage
+Range: [True, False]
+Default: True
+Testing: VARY - Affects pairing quality and storage efficiency
+6. metadata_level
+Description: Level of metadata storage for bag-learner configurations
+Range: ['minimal', 'complete', 'enhanced']
+Default: 'complete'
+Testing: VARY - Affects metadata completeness
+7. pairing_focus
+Description: Focus for pairing optimization strategy
+Range: ['performance', 'diversity', 'efficiency']
+Default: 'performance'
+Testing: VARY - Affects pairing optimization
+�� MODALITY WEIGHTAGE ANALYSIS HYPERPARAMETERS
+8. feature_ratio_weight
+Description: Weight for feature selection ratio in modality importance calculation
+Range: [0.2, 0.3, 0.4, 0.5]
+Default: 0.4
+Testing: VARY - Affects modality weightage calculation
+9. variance_weight
+Description: Weight for data variance in modality importance calculation
+Range: [0.2, 0.3, 0.4, 0.5]
+Default: 0.3
+Testing: VARY - Affects modality weightage calculation
+10. dimensionality_weight
+Description: Weight for dimensionality in modality importance calculation
+Range: [0.2, 0.3, 0.4, 0.5]
+Default: 0.3
+Testing: VARY - Affects modality weightage calculation
+🎯 PERFORMANCE PREDICTION HYPERPARAMETERS
+11. base_performance
+Description: Base performance score for learner performance prediction
+Range: [0.5, 0.6, 0.7, 0.8]
+Default: 0.6
+Testing: FIXED - Keep 0.6 for standard baseline
+12. diversity_bonus
+Description: Bonus multiplier for modality diversity in performance prediction
+Range: [0.05, 0.1, 0.15, 0.2]
 Default: 0.1
-Testing: VARY - Key parameter for denoising effectiveness
-denoising_strategy
-Description: Denoising weight adaptation strategy - controls how denoising weight changes during training
-Range: ['adaptive', 'fixed', 'progressive']
-Default: 'adaptive'
-Testing: VARY - Novel feature testing
-denoising_objectives
-Description: Active denoising objectives - controls which cross-modal learning objectives are used
-Range: [['reconstruction'], ['alignment'], ['consistency'], ['information'], ['reconstruction', 'alignment'], ['reconstruction', 'alignment', 'consistency']]
-Default: ['reconstruction', 'alignment']
-Testing: VARY - Novel feature testing
-🎯 QUALITY ASSURANCE HYPERPARAMETERS
-early_stopping_patience
-Description: Number of epochs to wait before early stopping - prevents overfitting and saves training time
-Range: [5, 10, 15, 20, 50]
-Default: 15
-Testing: VARY - Affects training efficiency and generalization
-validation_split
-Description: Fraction of training data used for validation - controls validation set size
-Range: [0.1, 0.2, 0.3]
-Default: 0.2
-Testing: FIXED - Keep 0.2 for standard validation
-cross_validation_folds
-Description: Number of K-fold cross-validation folds - controls validation strategy
-Range: [0, 3, 5, 10]
-Default: 0 (disabled)
-Testing: FIXED - Keep 0 for efficiency
-🎯 PERFORMANCE OPTIMIZATION HYPERPARAMETERS
-mixed_precision
-Description: Enables mixed precision training for memory efficiency and speed
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for efficiency
-gradient_accumulation_steps
-Description: Number of gradient accumulation steps before optimizer update
-Range: [1, 2, 4, 8]
+Testing: VARY - Affects performance prediction accuracy
+13. weightage_bonus
+Description: Bonus multiplier for modality weightage in performance prediction
+Range: [0.05, 0.1, 0.15, 0.2]
+Default: 0.1
+Testing: VARY - Affects performance prediction accuracy
+14. dropout_penalty
+Description: Penalty multiplier for dropout rate in performance prediction
+Range: [0.05, 0.1, 0.15, 0.2]
+Default: 0.1
+Testing: VARY - Affects performance prediction accuracy
+🎯 LEARNER TYPE SELECTION HYPERPARAMETERS
+15. single_modality_threshold
+Description: Threshold for single modality learner selection
+Range: [1, 2, 3]
 Default: 1
-Testing: FIXED - Keep 1 for standard training
-num_workers
-Description: Number of data loading workers for parallel data processing
-Range: [2, 4, 8, 16]
-Default: 4
-Testing: FIXED - Keep 4 for standard performance
-🎯 ADVANCED TRAINING HYPERPARAMETERS
-enable_progressive_learning
-Description: Enables progressive learning system - your novel feature for adaptive training complexity
-Range: [True, False]
-Default: False
-Testing: FIXED - Keep False for standard training
-label_smoothing
-Description: Label smoothing factor for regularization - improves generalization
-Range: [0.0, 0.1, 0.2, 0.3]
-Default: 0.0
-Testing: FIXED - Keep 0.0 for standard training
-dropout_rate
-Description: Dropout rate for regularization - prevents overfitting
-Range: [0.0, 0.1, 0.2, 0.3, 0.5]
-Default: 0.2
-Testing: FIXED - Keep 0.2 for standard regularization
-�� MONITORING AND LOGGING HYPERPARAMETERS
-verbose
-Description: Enables detailed training progress logging
+Testing: FIXED - Keep 1 for single modality detection
+16. fusion_threshold
+Description: Threshold for fusion learner selection
+Range: [2, 3, 4, 5]
+Default: 2
+Testing: VARY - Affects learner type selection
+17. advanced_fusion_threshold
+Description: Threshold for advanced fusion learner selection
+Range: [3, 4, 5, 6]
+Default: 3
+Testing: VARY - Affects learner type selection
+🎯 VALIDATION AND CONTROL HYPERPARAMETERS
+18. random_state
+Description: Random seed for reproducible learner selection and configuration
+Range: [42, 123, 456, 789, 1000, ...] (any integer)
+Default: 42
+Testing: EXPERIMENT-DEPENDENT - Set based on test run number, not varied per test
+19. verbose
+Description: Enables detailed learner selection progress logging
 Range: [True, False]
 Default: True
 Testing: FIXED - Keep True for monitoring
-save_checkpoints
-Description: Saves model checkpoints during training for recovery
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for safety
-tensorboard_logging
-Description: Enables TensorBoard logging for training visualization
-Range: [True, False]
-Default: False
-Testing: FIXED - Keep False for efficiency
-wandb_logging
-Description: Enables Weights & Biases logging for experiment tracking
-Range: [True, False]
-Default: False
-Testing: FIXED - Keep False for efficiency
 
 //abalation studies
 1. MODALITY-AWARE LEARNER SELECTION ABLATION STUDY
 Study Name: Modality_Aware_Learner_Selection_Ablation
 Feature Being Tested:
-Modality-Aware Weak Learner Selector - Your novel adaptive learner selection system that analyzes modality patterns in each bag and selects optimal base learners based on the specific modality composition, rather than using a one-size-fits-all approach
+Modality-Aware Bag-Specific Learner Selection - Your novel adaptive learner selection system that analyzes modality patterns in each bag and selects optimal base learners based on the specific modality composition, rather than using a one-size-fits-all approach
 Control (Baseline):
-Fixed Learner Selection: selection_strategy='fixed' with modality_specialization=False - Traditional ensemble methods that use the same learner type for all bags regardless of modality patterns
+Fixed Learner Selection: optimization_mode='fixed' with modality_aware=False - Traditional ensemble methods that use the same learner type for all bags regardless of modality patterns
 Variables for the Study:
 ablation_variables = [
     # Control group (baselines)
-    {'name': 'Fixed_Neural_Network', 'selection_strategy': 'fixed', 'modality_specialization': False, 'default_learner_type': 'neural_network'},
-    {'name': 'Fixed_Tree_Based', 'selection_strategy': 'fixed', 'modality_specialization': False, 'default_learner_type': 'tree_based'},
-    {'name': 'Fixed_Linear', 'selection_strategy': 'fixed', 'modality_specialization': False, 'default_learner_type': 'linear'},
-    {'name': 'Random_Selection', 'selection_strategy': 'random', 'modality_specialization': False},
+    {'name': 'Fixed_Neural_Network', 'optimization_mode': 'fixed', 'modality_aware': False, 'default_learner_type': 'neural_network'},
+    {'name': 'Fixed_Tree_Based', 'optimization_mode': 'fixed', 'modality_aware': False, 'default_learner_type': 'tree_based'},
+    {'name': 'Fixed_Linear', 'optimization_mode': 'fixed', 'modality_aware': False, 'default_learner_type': 'linear'},
+    {'name': 'Random_Selection', 'optimization_mode': 'random', 'modality_aware': False},
     
     # Treatment group (your novel feature)
-    {'name': 'Modality_Aware_Adaptive', 'selection_strategy': 'adaptive', 'modality_specialization': True},
+    {'name': 'Modality_Aware_Adaptive', 'optimization_mode': 'adaptive', 'modality_aware': True},
     
     # Additional modality-aware variants
-    {'name': 'Modality_Aware_Low_Diversity', 'selection_strategy': 'adaptive', 'modality_specialization': True, 'learner_diversity_weight': 0.1},
-    {'name': 'Modality_Aware_High_Diversity', 'selection_strategy': 'adaptive', 'modality_specialization': True, 'learner_diversity_weight': 0.5},
+    {'name': 'Modality_Aware_Low_Diversity', 'optimization_mode': 'adaptive', 'modality_aware': True, 'learner_diversity_weight': 0.1},
+    {'name': 'Modality_Aware_High_Diversity', 'optimization_mode': 'adaptive', 'modality_aware': True, 'learner_diversity_weight': 0.5},
 ]
+Metrics to Compare:
+Ensemble performance (accuracy, F1-score, AUC-ROC)
+Learner diversity across bags
+Modality utilization efficiency
+Training time and computational cost
+Bag-specific performance variance
+Expected Outcome:
+Modality-aware adaptive selection should outperform fixed selection by 5-15% in performance while maintaining or improving ensemble diversity
 
-2. OPTIMIZATION STRATEGY IMPACT ABLATION STUDY
-Study Name: Optimization_Strategy_Impact_Ablation
+2. OPTIMIZATION MODE IMPACT ABLATION STUDY
+Study Name: Optimization_Mode_Impact_Ablation
 Feature Being Tested:
-Adaptive Optimization Strategy Selection - Your novel multi-objective optimization system that dynamically adjusts learner selection based on different optimization goals (accuracy, speed, memory, balanced), rather than focusing only on accuracy
+Optimization Mode Selection - Your novel system that adapts learner configuration based on optimization goals (accuracy, performance, efficiency) rather than using uniform configuration
 Control (Baseline):
-Accuracy-Only Optimization: optimization_strategy='accuracy' - Traditional ensemble methods that optimize only for accuracy without considering efficiency or resource constraints
+Uniform Configuration: optimization_mode='uniform' - Traditional ensemble methods that use the same configuration for all learners regardless of optimization goals
 Variables for the Study:
 ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Accuracy_Only', 'optimization_strategy': 'accuracy', 'selection_strategy': 'adaptive'},
+    # Control group (baselines)
+    {'name': 'Uniform_Configuration', 'optimization_mode': 'uniform', 'adaptive_config': False},
+    {'name': 'Fixed_Accuracy', 'optimization_mode': 'accuracy', 'adaptive_config': False},
+    {'name': 'Fixed_Performance', 'optimization_mode': 'performance', 'adaptive_config': False},
+    {'name': 'Fixed_Efficiency', 'optimization_mode': 'efficiency', 'adaptive_config': False},
     
     # Treatment group (your novel feature)
-    {'name': 'Speed_Optimized', 'optimization_strategy': 'speed', 'selection_strategy': 'adaptive'},
-    {'name': 'Memory_Optimized', 'optimization_strategy': 'memory', 'selection_strategy': 'adaptive'},
-    {'name': 'Balanced_Optimization', 'optimization_strategy': 'balanced', 'selection_strategy': 'adaptive'},
+    {'name': 'Adaptive_Accuracy', 'optimization_mode': 'accuracy', 'adaptive_config': True},
+    {'name': 'Adaptive_Performance', 'optimization_mode': 'performance', 'adaptive_config': True},
+    {'name': 'Adaptive_Efficiency', 'optimization_mode': 'efficiency', 'adaptive_config': True},
     
-    # Additional optimization variants
-    {'name': 'Balanced_Low_Threshold', 'optimization_strategy': 'balanced', 'performance_threshold': 0.05},
-    {'name': 'Balanced_High_Threshold', 'optimization_strategy': 'balanced', 'performance_threshold': 0.3},
-    {'name': 'Speed_Low_Threshold', 'optimization_strategy': 'speed', 'performance_threshold': 0.05},
-    {'name': 'Memory_Low_Threshold', 'optimization_strategy': 'memory', 'performance_threshold': 0.05},
+    # Mixed optimization modes
+    {'name': 'Mixed_Accuracy_Performance', 'optimization_mode': 'mixed', 'adaptive_config': True, 'mode_weights': {'accuracy': 0.6, 'performance': 0.4}},
+    {'name': 'Mixed_Performance_Efficiency', 'optimization_mode': 'mixed', 'adaptive_config': True, 'mode_weights': {'performance': 0.6, 'efficiency': 0.4}},
 ]
+Metrics to Compare:
+Task-specific performance (accuracy for classification, MSE for regression)
+Computational efficiency (training time, memory usage)
+Model complexity (number of parameters, inference time)
+Configuration diversity across bags
+Optimization goal achievement
+Expected Outcome:
+Adaptive configuration should achieve 10-20% better performance in the target optimization mode while maintaining reasonable efficiency
 
-3. CROSS-MODAL COMPATIBILITY ANALYSIS ABLATION STUDY
-Study Name: Cross_Modal_Compatibility_Analysis_Ablation
+3. MODALITY WEIGHTAGE ANALYSIS ABLATION STUDY
+Study Name: Modality_Weightage_Analysis_Ablation
 Feature Being Tested:
-Cross-Modal Learner Compatibility Analysis - Your novel compatibility assessment system that evaluates how well different learner types work with specific modality combinations and ensures optimal learner-modality matching
+Modality Weightage Analysis - Your novel system that calculates importance scores for each modality in each bag and uses them for learner selection, rather than treating all modalities equally
 Control (Baseline):
-No Compatibility Consideration: selection_strategy='random' with learner_diversity_weight=0.0 - Random learner selection without considering modality-learner compatibility or diversity optimization
+Equal Modality Treatment: modality_weightage='equal' - Traditional ensemble methods that treat all modalities with equal importance regardless of their actual contribution
 Variables for the Study:
 ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Random_No_Compatibility', 'selection_strategy': 'random', 'learner_diversity_weight': 0.0},
-    {'name': 'Fixed_No_Compatibility', 'selection_strategy': 'fixed', 'learner_diversity_weight': 0.0, 'modality_specialization': False},
+    # Control group (baselines)
+    {'name': 'Equal_Modality_Weightage', 'modality_weightage': 'equal', 'weightage_analysis': False},
+    {'name': 'Random_Modality_Weightage', 'modality_weightage': 'random', 'weightage_analysis': False},
+    {'name': 'Fixed_Modality_Weightage', 'modality_weightage': 'fixed', 'weightage_analysis': False, 'fixed_weights': {'text': 0.4, 'image': 0.3, 'tabular': 0.3}},
     
     # Treatment group (your novel feature)
-    {'name': 'Compatibility_Aware_Low_Diversity', 'selection_strategy': 'adaptive', 'learner_diversity_weight': 0.1, 'modality_specialization': True},
-    {'name': 'Compatibility_Aware_Medium_Diversity', 'selection_strategy': 'adaptive', 'learner_diversity_weight': 0.3, 'modality_specialization': True},
-    {'name': 'Compatibility_Aware_High_Diversity', 'selection_strategy': 'adaptive', 'learner_diversity_weight': 0.5, 'modality_specialization': True},
+    {'name': 'Variance_Based_Weightage', 'modality_weightage': 'variance', 'weightage_analysis': True, 'weightage_method': 'variance'},
+    {'name': 'Feature_Based_Weightage', 'modality_weightage': 'feature', 'weightage_analysis': True, 'weightage_method': 'feature'},
+    {'name': 'Combined_Weightage', 'modality_weightage': 'combined', 'weightage_analysis': True, 'weightage_method': 'combined'},
     
-    # Additional compatibility variants
-    {'name': 'Compatibility_No_Validation', 'selection_strategy': 'adaptive', 'learner_diversity_weight': 0.3, 'modality_specialization': True, 'enable_validation': False},
-    {'name': 'Compatibility_With_Validation', 'selection_strategy': 'adaptive', 'learner_diversity_weight': 0.3, 'modality_specialization': True, 'enable_validation': True},
+    # Weightage analysis variants
+    {'name': 'High_Variance_Weight', 'modality_weightage': 'variance', 'weightage_analysis': True, 'variance_weight': 0.6},
+    {'name': 'High_Feature_Weight', 'modality_weightage': 'feature', 'weightage_analysis': True, 'feature_weight': 0.6},
+    {'name': 'High_Dimensionality_Weight', 'modality_weightage': 'dimensionality', 'weightage_analysis': True, 'dimensionality_weight': 0.6},
 ]
+Metrics to Compare:
+Modality importance accuracy (correlation with actual performance contribution)
+Learner selection quality (how well selected learners match modality patterns)
+Ensemble diversity (variety of learner types across bags)
+Performance improvement (accuracy, F1-score, AUC-ROC)
+Weightage stability across different datasets
+Expected Outcome:
+Modality weightage analysis should improve learner selection quality by 15-25% and lead to 5-10% better ensemble performance
 
-4. COMPREHENSIVE NOVEL FEATURES ABLATION STUDY
-Study Name: Comprehensive_Novel_Features_Ablation
+4. BAG-LEARNER PAIRING ABLATION STUDY
+Study Name: Bag_Learner_Pairing_Ablation
 Feature Being Tested:
-All Three Novel Features Combined - Testing the additive effects and interactions between all your novel Stage 3 features: Modality-Aware Selection, Optimization Strategy Selection, and Cross-Modal Compatibility Analysis
+Bag-Learner Pairing Storage - Your novel system that stores complete bag-learner configurations with metadata, rather than just storing learners separately from bags
 Control (Baseline):
-No Novel Features: selection_strategy='fixed', modality_specialization=False, optimization_strategy='accuracy', learner_diversity_weight=0.0 - Traditional ensemble learner selection without any novel features
+Separate Storage: bag_learner_pairing=False - Traditional ensemble methods that store bags and learners separately without maintaining their relationships
 Variables for the Study:
 ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Baseline_No_Novel_Features', 'selection_strategy': 'fixed', 'modality_specialization': False, 'optimization_strategy': 'accuracy', 'learner_diversity_weight': 0.0},
+    # Control group (baselines)
+    {'name': 'Separate_Storage', 'bag_learner_pairing': False, 'metadata_storage': False},
+    {'name': 'Basic_Pairing', 'bag_learner_pairing': True, 'metadata_storage': False},
+    {'name': 'Minimal_Metadata', 'bag_learner_pairing': True, 'metadata_storage': True, 'metadata_level': 'minimal'},
     
-    # Individual novel features
-    {'name': 'Modality_Aware_Only', 'selection_strategy': 'adaptive', 'modality_specialization': True, 'optimization_strategy': 'accuracy', 'learner_diversity_weight': 0.0},
-    {'name': 'Optimization_Strategy_Only', 'selection_strategy': 'fixed', 'modality_specialization': False, 'optimization_strategy': 'balanced', 'learner_diversity_weight': 0.0},
-    {'name': 'Compatibility_Analysis_Only', 'selection_strategy': 'adaptive', 'modality_specialization': False, 'optimization_strategy': 'accuracy', 'learner_diversity_weight': 0.3},
+    # Treatment group (your novel feature)
+    {'name': 'Complete_Pairing', 'bag_learner_pairing': True, 'metadata_storage': True, 'metadata_level': 'complete'},
+    {'name': 'Enhanced_Pairing', 'bag_learner_pairing': True, 'metadata_storage': True, 'metadata_level': 'enhanced'},
     
-    # Pairwise combinations
-    {'name': 'Modality_Aware_Plus_Optimization', 'selection_strategy': 'adaptive', 'modality_specialization': True, 'optimization_strategy': 'balanced', 'learner_diversity_weight': 0.0},
-    {'name': 'Modality_Aware_Plus_Compatibility', 'selection_strategy': 'adaptive', 'modality_specialization': True, 'optimization_strategy': 'accuracy', 'learner_diversity_weight': 0.3},
-    {'name': 'Optimization_Plus_Compatibility', 'selection_strategy': 'adaptive', 'modality_specialization': False, 'optimization_strategy': 'balanced', 'learner_diversity_weight': 0.3},
-    
-    # All novel features combined
-    {'name': 'All_Novel_Features_Combined', 'selection_strategy': 'adaptive', 'modality_specialization': True, 'optimization_strategy': 'balanced', 'learner_diversity_weight': 0.3},
+    # Pairing variants
+    {'name': 'Performance_Focused_Pairing', 'bag_learner_pairing': True, 'metadata_storage': True, 'pairing_focus': 'performance'},
+    {'name': 'Diversity_Focused_Pairing', 'bag_learner_pairing': True, 'metadata_storage': True, 'pairing_focus': 'diversity'},
+    {'name': 'Efficiency_Focused_Pairing', 'bag_learner_pairing': True, 'metadata_storage': True, 'pairing_focus': 'efficiency'},
 ]
+Metrics to Compare:
+Bag-learner relationship accuracy (how well stored relationships match actual performance)
+Metadata completeness (coverage of important bag characteristics)
+Storage efficiency (memory usage, access time)
+Ensemble coherence (consistency of bag-learner assignments)
+Performance prediction accuracy (how well stored metadata predicts performance)
+Expected Outcome:
+Complete bag-learner pairing should improve ensemble coherence by 20-30% and lead to 3-8% better performance prediction accuracy
 
-//intepretability tests
-1. Learner Selection Pattern Analysis
-def analyze_learner_selection_patterns(model):
-    """Analyze which learners are selected for different modality patterns"""
-    # Get Stage 3 interpretability data
-    stage3_data = model.get_stage3_interpretability_data()
-    
-    learner_selections = stage3_data['learner_selections']
-    modality_patterns = stage3_data['modality_patterns']
-    
-    # Analyze selection patterns
-    selection_patterns = {}
-    for bag_id, selection in learner_selections.items():
-        pattern = tuple(sorted(modality_patterns[bag_id]))
-        if pattern not in selection_patterns:
-            selection_patterns[pattern] = []
-        selection_patterns[pattern].append(selection['selected_learner'])
-    
-    return {
-        'selection_patterns': selection_patterns,
-        'learner_frequency': stage3_data['learner_frequency'],
-        'modality_learner_mapping': stage3_data['modality_learner_mapping'],
-        'selection_consistency': stage3_data['selection_consistency']
-    }
-Interpretability Questions:
-Which learners are most commonly selected for each modality pattern?
-How consistent is learner selection for similar modality patterns?
-Are there any modality patterns that always get the same learner type?
-
-2. Optimization Strategy Impact Analysis
-def analyze_optimization_strategy_impact(model):
-    """Analyze how optimization strategy affects learner selection"""
-    stage3_data = model.get_stage3_interpretability_data()
-    
-    optimization_impact = stage3_data['optimization_impact']
-    
-    return {
-        'strategy_performance': optimization_impact['strategy_performance'],
-        'learner_distribution_by_strategy': optimization_impact['learner_distribution'],
-        'efficiency_metrics': optimization_impact['efficiency_metrics'],
-        'accuracy_vs_efficiency_tradeoff': optimization_impact['tradeoff_analysis']
-    }
-Interpretability Questions:
-How does each optimization strategy affect learner selection?
-What's the trade-off between accuracy and efficiency for each strategy?
-Which strategy produces the most balanced learner distribution?
-
-3. Cross-Modal Compatibility Analysis
-def analyze_cross_modal_compatibility(model):
-    """Analyze modality-learner compatibility patterns"""
-    stage3_data = model.get_stage3_interpretability_data()
-    
-    compatibility_matrix = stage3_data['compatibility_matrix']
-    compatibility_scores = stage3_data['compatibility_scores']
-    
-    return {
-        'compatibility_matrix': compatibility_matrix,
-        'compatibility_scores': compatibility_scores,
-        'best_modality_learner_pairs': stage3_data['best_pairs'],
-        'worst_modality_learner_pairs': stage3_data['worst_pairs'],
-        'compatibility_variance': stage3_data['compatibility_variance']
-    }
-Interpretability Questions:
-Which modality-learner combinations have the highest compatibility?
-Are there any modality patterns that are incompatible with certain learners?
-How does compatibility affect final ensemble performance?
-
-4. Performance Threshold Analysis
-def analyze_performance_threshold_impact(model):
-    """Analyze how performance thresholds affect learner selection"""
-    stage3_data = model.get_stage3_interpretability_data()
-    
-    threshold_analysis = stage3_data['threshold_analysis']
-    
-    return {
-        'threshold_impact': threshold_analysis['threshold_impact'],
-        'rejected_learners': threshold_analysis['rejected_learners'],
-        'threshold_efficiency': threshold_analysis['threshold_efficiency'],
-        'quality_vs_quantity_tradeoff': threshold_analysis['tradeoff_analysis']
-    }
-Interpretability Questions:
-How many learners are rejected due to performance thresholds?
-What's the impact of different threshold values on ensemble quality?
-Is there an optimal threshold that balances quality and quantity?
-
-5. Learner Diversity Analysis
-def analyze_learner_diversity(model):
-    """Analyze diversity patterns in selected learners"""
-    stage3_data = model.get_stage3_interpretability_data()
-    
-    diversity_metrics = stage3_data['diversity_metrics']
-    
-    return {
-        'learner_diversity': diversity_metrics['learner_diversity'],
-        'diversity_distribution': diversity_metrics['diversity_distribution'],
-        'diversity_vs_performance': diversity_metrics['diversity_performance_correlation'],
-        'diversity_optimization_effectiveness': diversity_metrics['optimization_effectiveness']
-    }
-Interpretability Questions:
-How diverse are the selected learners across the ensemble?
-Does learner diversity correlate with ensemble performance?
-How effective is the diversity optimization strategy?
-
-6. Adaptive Selection Behavior Analysis
-def analyze_adaptive_selection_behavior(model):
-    """Analyze how adaptive selection strategy behaves"""
-    stage3_data = model.get_stage3_interpretability_data()
-    
-    adaptive_behavior = stage3_data['adaptive_behavior']
-    
-    return {
-        'selection_evolution': adaptive_behavior['selection_evolution'],
-        'adaptation_patterns': adaptive_behavior['adaptation_patterns'],
-        'strategy_effectiveness': adaptive_behavior['strategy_effectiveness'],
-        'learning_curve': adaptive_behavior['learning_curve']
-    }
-Interpretability Questions:
-How does the selection strategy evolve as more bags are processed?
-What patterns emerge in the adaptive selection process?
-How effective is the adaptive strategy compared to fixed strategies?
-
-7. Validation Impact Analysis
-def analyze_validation_impact(model):
-    """Analyze how validation affects learner selection"""
-    stage3_data = model.get_stage3_interpretability_data()
-    
-    validation_impact = stage3_data['validation_impact']
-    
-    return {
-        'validation_effectiveness': validation_impact['validation_effectiveness'],
-        'validation_time_impact': validation_impact['time_impact'],
-        'validation_accuracy': validation_impact['validation_accuracy'],
-        'validation_vs_no_validation': validation_impact['comparison']
-    }
-Interpretability Questions:
-How accurate is the validation process in predicting learner performance?
-What's the time cost of validation vs its benefits?
-Does validation significantly improve learner selection quality?
-
-8. Complete Stage 3 Interpretability Analysis
-def comprehensive_stage3_interpretability_study(model):
-    """Comprehensive interpretability analysis for Stage 3 only"""
-    
+//intepretablity tests
+1. Modality Importance Analysis
+Description: Analyze how different modalities contribute to learner selection decisions
+Implementation:
+def test_modality_importance_interpretability(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """Test interpretability of modality importance in learner selection."""
     results = {}
     
-    # 1. Learner selection pattern analysis
-    results['learner_selection_patterns'] = analyze_learner_selection_patterns(model)
-    
-    # 2. Optimization strategy impact analysis
-    results['optimization_strategy_impact'] = analyze_optimization_strategy_impact(model)
-    
-    # 3. Cross-modal compatibility analysis
-    results['cross_modal_compatibility'] = analyze_cross_modal_compatibility(model)
-    
-    # 4. Performance threshold analysis
-    results['performance_threshold_impact'] = analyze_performance_threshold_impact(model)
-    
-    # 5. Learner diversity analysis
-    results['learner_diversity'] = analyze_learner_diversity(model)
-    
-    # 6. Adaptive selection behavior analysis
-    results['adaptive_selection_behavior'] = analyze_adaptive_selection_behavior(model)
-    
-    # 7. Validation impact analysis
-    results['validation_impact'] = analyze_validation_impact(model)
+    for scenario_name, scenario_config in test_scenarios.items():
+        try:
+            # Create test model with specific modality configurations
+            test_model = MultiModalEnsembleModel(
+                n_bags=self.n_bags,
+                dropout_strategy=self.dropout_strategy,
+                optimization_mode=self.optimization_mode,
+                modality_aware=self.modality_aware,
+                feature_ratio_weight=scenario_config.get('feature_ratio_weight', 0.4),
+                variance_weight=scenario_config.get('variance_weight', 0.3),
+                dimensionality_weight=scenario_config.get('dimensionality_weight', 0.3),
+                random_state=self.random_state,
+                verbose=False
+            )
+            
+            test_model.fit(self.train_data, self.train_labels)
+            
+            # Analyze modality importance
+            bag_learner_summary = test_model.get_bag_learner_summary()
+            stage3_interpretability = test_model.get_stage3_interpretability_data()
+            
+            # Calculate modality importance metrics
+            modality_importance = self._calculate_modality_importance_interpretability(
+                bag_learner_summary, stage3_interpretability
+            )
+            
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'modality_importance': modality_importance,
+                'interpretability_score': self._calculate_modality_importance_interpretability_score(modality_importance),
+                'success': True
+            }
+            
+        except Exception as e:
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'error': str(e),
+                'success': False
+            }
     
     return results
+Test Scenarios:
+Single Modality Dominance: Test with one modality having much higher importance
+Balanced Modalities: Test with equal importance across all modalities
+Modality Interaction: Test how modality combinations affect importance
+Interpretability Questions:
+How does modality importance correlate with learner selection?
+Are high-importance modalities consistently assigned appropriate learners?
+How does modality interaction affect selection decisions?
+
+2. Learner Selection Decision Analysis
+Description: Understand the decision-making process for learner selection
+Implementation:
+def test_learner_selection_interpretability(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """Test interpretability of learner selection decisions."""
+    results = {}
+    
+    for scenario_name, scenario_config in test_scenarios.items():
+        try:
+            # Create test model with specific selection parameters
+            test_model = MultiModalEnsembleModel(
+                n_bags=self.n_bags,
+                dropout_strategy=self.dropout_strategy,
+                optimization_mode=scenario_config.get('optimization_mode', 'accuracy'),
+                modality_aware=scenario_config.get('modality_aware', True),
+                bag_learner_pairing=scenario_config.get('bag_learner_pairing', True),
+                random_state=self.random_state,
+                verbose=False
+            )
+            
+            test_model.fit(self.train_data, self.train_labels)
+            
+            # Analyze learner selection decisions
+            bag_learner_summary = test_model.get_bag_learner_summary()
+            pairing_stats = test_model.get_pairing_statistics()
+            ensemble_coherence = test_model.get_ensemble_coherence()
+            
+            # Calculate selection decision metrics
+            selection_decisions = self._calculate_learner_selection_interpretability(
+                bag_learner_summary, pairing_stats, ensemble_coherence
+            )
+            
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'selection_decisions': selection_decisions,
+                'interpretability_score': self._calculate_learner_selection_interpretability_score(selection_decisions),
+                'success': True
+            }
+            
+        except Exception as e:
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'error': str(e),
+                'success': False
+            }
+    
+    return results
+Test Scenarios:
+Modality-Learner Mapping: Test how different modality combinations map to learner types
+Optimization Mode Impact: Test how optimization mode affects selection decisions
+Bag Characteristics: Test how bag properties influence learner selection
+Interpretability Questions:
+What factors drive learner selection decisions?
+How consistent are selection decisions across similar bags?
+Can we predict learner selection based on bag characteristics?
+
+3. Performance Prediction Interpretability
+Description: Understand how performance predictions are made and their accuracy
+Implementation:
+def test_performance_prediction_interpretability(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """Test interpretability of performance prediction system."""
+    results = {}
+    
+    for scenario_name, scenario_config in test_scenarios.items():
+        try:
+            # Create test model with specific prediction parameters
+            test_model = MultiModalEnsembleModel(
+                n_bags=self.n_bags,
+                dropout_strategy=self.dropout_strategy,
+                optimization_mode=self.optimization_mode,
+                modality_aware=self.modality_aware,
+                base_performance=scenario_config.get('base_performance', 0.6),
+                diversity_bonus=scenario_config.get('diversity_bonus', 0.1),
+                weightage_bonus=scenario_config.get('weightage_bonus', 0.1),
+                dropout_penalty=scenario_config.get('dropout_penalty', 0.1),
+                random_state=self.random_state,
+                verbose=False
+            )
+            
+            test_model.fit(self.train_data, self.train_labels)
+            
+            # Analyze performance prediction system
+            bag_learner_summary = test_model.get_bag_learner_summary()
+            stage3_interpretability = test_model.get_stage3_interpretability_data()
+            
+            # Calculate performance prediction interpretability
+            prediction_interpretability = self._calculate_performance_prediction_interpretability(
+                bag_learner_summary, stage3_interpretability
+            )
+            
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'prediction_interpretability': prediction_interpretability,
+                'interpretability_score': self._calculate_performance_prediction_interpretability_score(prediction_interpretability),
+                'success': True
+            }
+            
+        except Exception as e:
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'error': str(e),
+                'success': False
+            }
+    
+    return results
+Test Scenarios:
+Prediction Accuracy: Test how well predictions match actual performance
+Prediction Consistency: Test consistency of predictions across similar bags
+Prediction Calibration: Test if predictions are well-calibrated
+Interpretability Questions:
+How accurate are performance predictions?
+What factors contribute most to performance predictions?
+Are predictions well-calibrated across different scenarios?
+
+4. Bag-Learner Pairing Interpretability
+Description: Understand the quality and consistency of bag-learner pairings
+Implementation:
+def test_bag_learner_pairing_interpretability(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """Test interpretability of bag-learner pairing system."""
+    results = {}
+    
+    for scenario_name, scenario_config in test_scenarios.items():
+        try:
+            # Create test model with specific pairing configuration
+            test_model = MultiModalEnsembleModel(
+                n_bags=self.n_bags,
+                dropout_strategy=self.dropout_strategy,
+                optimization_mode=self.optimization_mode,
+                modality_aware=self.modality_aware,
+                bag_learner_pairing=scenario_config.get('bag_learner_pairing', True),
+                metadata_level=scenario_config.get('metadata_level', 'complete'),
+                pairing_focus=scenario_config.get('pairing_focus', 'performance'),
+                random_state=self.random_state,
+                verbose=False
+            )
+            
+            test_model.fit(self.train_data, self.train_labels)
+            
+            # Analyze bag-learner pairing system
+            pairing_stats = test_model.get_pairing_statistics()
+            metadata_completeness = test_model.get_metadata_completeness()
+            ensemble_coherence = test_model.get_ensemble_coherence()
+            
+            # Calculate pairing interpretability
+            pairing_interpretability = self._calculate_bag_learner_pairing_interpretability(
+                pairing_stats, metadata_completeness, ensemble_coherence
+            )
+            
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'pairing_interpretability': pairing_interpretability,
+                'interpretability_score': self._calculate_bag_learner_pairing_interpretability_score(pairing_interpretability),
+                'success': True
+            }
+            
+        except Exception as e:
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'error': str(e),
+                'success': False
+            }
+    
+    return results
+Test Scenarios:
+Pairing Quality: Test quality of bag-learner pairings
+Pairing Consistency: Test consistency across different pairing configurations
+Metadata Impact: Test how metadata completeness affects pairing quality
+Interpretability Questions:
+How well do bag-learner pairings match expected relationships?
+What factors contribute to high-quality pairings?
+How does metadata completeness affect pairing decisions?
+
+5. Ensemble Coherence Interpretability
+Description: Understand how coherent and consistent the ensemble is
+Implementation:
+def test_ensemble_coherence_interpretability(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """Test interpretability of ensemble coherence and consistency."""
+    results = {}
+    
+    for scenario_name, scenario_config in test_scenarios.items():
+        try:
+            # Create test model with specific ensemble configuration
+            test_model = MultiModalEnsembleModel(
+                n_bags=scenario_config.get('n_bags', 10),
+                dropout_strategy=self.dropout_strategy,
+                optimization_mode=self.optimization_mode,
+                modality_aware=self.modality_aware,
+                bag_learner_pairing=self.bag_learner_pairing,
+                random_state=self.random_state,
+                verbose=False
+            )
+            
+            test_model.fit(self.train_data, self.train_labels)
+            
+            # Analyze ensemble coherence
+            bag_learner_summary = test_model.get_bag_learner_summary()
+            pairing_stats = test_model.get_pairing_statistics()
+            ensemble_coherence = test_model.get_ensemble_coherence()
+            
+            # Calculate ensemble coherence interpretability
+            coherence_interpretability = self._calculate_ensemble_coherence_interpretability(
+                bag_learner_summary, pairing_stats, ensemble_coherence
+            )
+            
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'coherence_interpretability': coherence_interpretability,
+                'interpretability_score': self._calculate_ensemble_coherence_interpretability_score(coherence_interpretability),
+                'success': True
+            }
+            
+        except Exception as e:
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'error': str(e),
+                'success': False
+            }
+    
+    return results
+Test Scenarios:
+Ensemble Size Impact: Test how ensemble size affects coherence
+Learner Diversity: Test how learner diversity affects coherence
+Modality Distribution: Test how modality distribution affects coherence
+Interpretability Questions:
+How coherent is the ensemble across different configurations?
+What factors contribute to ensemble coherence?
+How does ensemble size affect coherence and interpretability?
+
+6. Optimization Mode Interpretability
+Description: Understand how different optimization modes affect the system
+Implementation:
+def test_optimization_mode_interpretability(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """Test interpretability of optimization mode selection."""
+    results = {}
+    
+    for scenario_name, scenario_config in test_scenarios.items():
+        try:
+            # Create test model with specific optimization mode
+            test_model = MultiModalEnsembleModel(
+                n_bags=self.n_bags,
+                dropout_strategy=self.dropout_strategy,
+                optimization_mode=scenario_config.get('optimization_mode', 'accuracy'),
+                modality_aware=self.modality_aware,
+                random_state=self.random_state,
+                verbose=False
+            )
+            
+            test_model.fit(self.train_data, self.train_labels)
+            
+            # Analyze optimization mode impact
+            bag_learner_summary = test_model.get_bag_learner_summary()
+            ensemble_coherence = test_model.get_ensemble_coherence()
+            stage3_interpretability = test_model.get_stage3_interpretability_data()
+            
+            # Calculate optimization mode interpretability
+            optimization_interpretability = self._calculate_optimization_mode_interpretability(
+                bag_learner_summary, ensemble_coherence, stage3_interpretability
+            )
+            
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'optimization_interpretability': optimization_interpretability,
+                'interpretability_score': self._calculate_optimization_mode_interpretability_score(optimization_interpretability),
+                'success': True
+            }
+            
+        except Exception as e:
+            results[scenario_name] = {
+                'scenario_config': scenario_config,
+                'error': str(e),
+                'success': False
+            }
+    
+    return results
+Test Scenarios:
+Accuracy Mode: Test interpretability under accuracy optimization
+Performance Mode: Test interpretability under performance optimization
+Efficiency Mode: Test interpretability under efficiency optimization
+Interpretability Questions:
+How do different optimization modes affect interpretability?
+What trade-offs exist between optimization and interpretability?
+Which optimization mode provides the most interpretable results?
+
 
 //robustness tests
-1. Optimization Strategy Robustness
-Purpose: Test how well the learner selection handles different optimization strategies
-Tests:
-Strategy Comparison: Test with balanced, accuracy, speed, memory optimization strategies
-Strategy Performance: Compare performance across different strategies
+1. Modality-Aware Selection Robustness
+Test Name: test_modality_aware_robustness
+Description: Test robustness of the novel modality-aware learner selection under different modality patterns and edge cases
+Implementation:
+def test_modality_aware_robustness(model, modality_scenarios):
+    """Test robustness of the modality-aware learner selection."""
+    results = {}
+    
+    for scenario_name, scenario_config in modality_scenarios.items():
+        # Create model with modality-aware selection and specific parameters
+        test_model = MultiModalEnsembleModel(
+            n_bags=model.n_bags,
+            dropout_strategy=model.dropout_strategy,
+            optimization_mode=scenario_config.get('optimization_mode', 'accuracy'),
+            modality_aware=scenario_config.get('modality_aware', True),
+            bag_learner_pairing=scenario_config.get('bag_learner_pairing', True),
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze modality-aware selection performance
+        bag_learner_summary = test_model.get_bag_learner_summary()
+        pairing_stats = test_model.get_pairing_statistics()
+        ensemble_coherence = test_model.get_ensemble_coherence()
+        
+        # Calculate modality-aware robustness metrics
+        modality_metrics = calculate_modality_aware_robustness(
+            bag_learner_summary, pairing_stats, ensemble_coherence
+        )
+        
+        results[scenario_name] = {
+            'scenario_config': scenario_config,
+            'bag_learner_summary': bag_learner_summary,
+            'pairing_statistics': pairing_stats,
+            'ensemble_coherence': ensemble_coherence,
+            'modality_metrics': modality_metrics,
+            'robustness_score': calculate_modality_aware_robustness_score(modality_metrics)
+        }
+    
+    return results
+Test Scenarios:
+Modality Pattern Variation: Test with different combinations of modalities (single, dual, multi-modal)
+Modality Imbalance: Test with highly imbalanced modality distributions
+Missing Modality Handling: Test robustness when certain modalities are completely absent
+Modality Quality Variation: Test with different quality levels of modality data
+Robustness Questions:
+How robust is the modality-aware selection to different modality patterns?
+Does the modality-aware selection maintain performance across different data conditions?
+How consistent are modality-learner assignments across different scenarios?
+What's the impact of modality imbalance on selection quality?
+
+2. Optimization Mode Robustness
+Test Name: test_optimization_mode_robustness
+Description: Test robustness of the optimization mode selection under different optimization strategies and their consistency
+Implementation:
+def test_optimization_mode_robustness(model, optimization_scenarios):
+    """Test robustness of the optimization mode selection."""
+    results = {}
+    
+    for scenario_name, scenario_config in optimization_scenarios.items():
+        # Create model with specific optimization mode
+        test_model = MultiModalEnsembleModel(
+            n_bags=model.n_bags,
+            dropout_strategy=model.dropout_strategy,
+            optimization_mode=scenario_config.get('optimization_mode', 'accuracy'),
+            modality_aware=scenario_config.get('modality_aware', True),
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze optimization mode performance
+        bag_learner_summary = test_model.get_bag_learner_summary()
+        ensemble_coherence = test_model.get_ensemble_coherence()
+        stage3_interpretability = test_model.get_stage3_interpretability_data()
+        
+        # Calculate optimization mode robustness metrics
+        optimization_metrics = calculate_optimization_mode_robustness(
+            bag_learner_summary, ensemble_coherence, stage3_interpretability
+        )
+        
+        results[scenario_name] = {
+            'scenario_config': scenario_config,
+            'bag_learner_summary': bag_learner_summary,
+            'ensemble_coherence': ensemble_coherence,
+            'stage3_interpretability': stage3_interpretability,
+            'optimization_metrics': optimization_metrics,
+            'robustness_score': calculate_optimization_mode_robustness_score(optimization_metrics)
+        }
+    
+    return results
+Test Scenarios:
+Strategy Comparison: Test with accuracy, performance, efficiency optimization modes
+Strategy Performance: Compare performance across different optimization strategies
 Strategy Consistency: Verify consistent learner selection within same strategy
 Strategy Adaptation: Test if strategy changes affect learner selection patterns
-optimization_strategy_robustness_tests = {
-    'strategies': ['balanced', 'accuracy', 'speed', 'memory'],
-    'performance_comparison': True,
-    'consistency_analysis': True,
-    'adaptation_testing': True
-}
+Robustness Questions:
+How robust is the optimization mode selection to different strategies?
+Does the optimization mode maintain performance across different data conditions?
+How consistent are learner configurations within the same optimization mode?
+What's the impact of optimization mode changes on learner selection patterns?
 
-2. Performance Threshold Robustness
-Purpose: Test robustness to different performance threshold values
-Tests:
-Threshold Range: Test with 0.3, 0.5, 0.7, 0.9 performance thresholds
-Threshold Impact: Measure how many learners are accepted/rejected
-Quality vs Quantity: Test trade-off between learner quality and quantity
-Threshold Sensitivity: Test with extreme threshold values (0.1, 0.95)
-performance_threshold_robustness_tests = {
-    'threshold_values': [0.1, 0.3, 0.5, 0.7, 0.9, 0.95],
-    'impact_analysis': True,
-    'quality_quantity_tradeoff': True,
-    'sensitivity_analysis': True
-}
+3. Modality Weightage Analysis Robustness
+Test Name: test_modality_weightage_robustness
+Description: Test robustness of the modality weightage calculation under different data characteristics and weight configurations
+Implementation:
+def test_modality_weightage_robustness(model, weightage_scenarios):
+    """Test robustness of the modality weightage analysis."""
+    results = {}
+    
+    for scenario_name, scenario_config in weightage_scenarios.items():
+        # Create model with specific weightage parameters
+        test_model = MultiModalEnsembleModel(
+            n_bags=model.n_bags,
+            dropout_strategy=model.dropout_strategy,
+            optimization_mode=model.optimization_mode,
+            modality_aware=model.modality_aware,
+            feature_ratio_weight=scenario_config.get('feature_ratio_weight', 0.4),
+            variance_weight=scenario_config.get('variance_weight', 0.3),
+            dimensionality_weight=scenario_config.get('dimensionality_weight', 0.3),
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze weightage analysis performance
+        bag_learner_summary = test_model.get_bag_learner_summary()
+        stage3_interpretability = test_model.get_stage3_interpretability_data()
+        
+        # Calculate weightage analysis robustness metrics
+        weightage_metrics = calculate_weightage_analysis_robustness(
+            bag_learner_summary, stage3_interpretability
+        )
+        
+        results[scenario_name] = {
+            'scenario_config': scenario_config,
+            'bag_learner_summary': bag_learner_summary,
+            'stage3_interpretability': stage3_interpretability,
+            'weightage_metrics': weightage_metrics,
+            'robustness_score': calculate_weightage_analysis_robustness_score(weightage_metrics)
+        }
+    
+    return results
+Test Scenarios:
+Weight Distribution Variation: Test with different weight combinations for feature_ratio, variance, dimensionality
+Data Variance Robustness: Test with high/low variance data across modalities
+Dimensionality Robustness: Test with different feature dimensions per modality
+Weight Sensitivity: Test sensitivity to weight parameter changes
+Robustness Questions:
+How robust is the weightage analysis to different weight configurations?
+Does the weightage analysis maintain accuracy across different data characteristics?
+How sensitive are modality importance calculations to weight parameter changes?
+What's the impact of data variance and dimensionality on weightage analysis?
 
-3. Learner Type Robustness
-Purpose: Test robustness to different learner type configurations
-Tests:
-Learner Type Availability: Test with different available learner types
-Learner Type Distribution: Test with balanced vs imbalanced learner type availability
-Learner Type Performance: Test with high vs low performing learner types
-Learner Type Compatibility: Test modality-learner compatibility patterns
-learner_type_robustness_tests = {
-    'available_learners': ['FusionLearner', 'PyTorchLearner', 'SklearnLearner'],
-    'distribution_patterns': ['balanced', 'imbalanced', 'single_type'],
-    'performance_levels': ['high', 'medium', 'low'],
-    'compatibility_testing': True
-}
+4. Bag-Learner Pairing Robustness
+Test Name: test_bag_learner_pairing_robustness
+Description: Test robustness of the bag-learner pairing system under different storage and metadata scenarios
+Implementation:
+def test_bag_learner_pairing_robustness(model, pairing_scenarios):
+    """Test robustness of the bag-learner pairing system."""
+    results = {}
+    
+    for scenario_name, scenario_config in pairing_scenarios.items():
+        # Create model with specific pairing configuration
+        test_model = MultiModalEnsembleModel(
+            n_bags=model.n_bags,
+            dropout_strategy=model.dropout_strategy,
+            optimization_mode=model.optimization_mode,
+            modality_aware=model.modality_aware,
+            bag_learner_pairing=scenario_config.get('bag_learner_pairing', True),
+            metadata_level=scenario_config.get('metadata_level', 'complete'),
+            pairing_focus=scenario_config.get('pairing_focus', 'performance'),
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze pairing system performance
+        pairing_stats = test_model.get_pairing_statistics()
+        metadata_completeness = test_model.get_metadata_completeness()
+        ensemble_coherence = test_model.get_ensemble_coherence()
+        
+        # Calculate pairing system robustness metrics
+        pairing_metrics = calculate_pairing_system_robustness(
+            pairing_stats, metadata_completeness, ensemble_coherence
+        )
+        
+        results[scenario_name] = {
+            'scenario_config': scenario_config,
+            'pairing_statistics': pairing_stats,
+            'metadata_completeness': metadata_completeness,
+            'ensemble_coherence': ensemble_coherence,
+            'pairing_metrics': pairing_metrics,
+            'robustness_score': calculate_pairing_system_robustness_score(pairing_metrics)
+        }
+    
+    return results
+Test Scenarios:
+Pairing Storage Robustness: Test with different pairing storage configurations
+Metadata Level Robustness: Test with minimal, complete, enhanced metadata levels
+Pairing Focus Robustness: Test with performance, diversity, efficiency pairing focuses
+Pairing Consistency: Verify consistent pairing quality across different scenarios
+Robustness Questions:
+How robust is the pairing system to different storage configurations?
+Does the pairing system maintain quality across different metadata levels?
+How consistent are bag-learner relationships across different pairing focuses?
+What's the impact of metadata completeness on pairing quality?
 
-4. Modality Pattern Robustness
-Purpose: Test robustness to different modality patterns in bags
-Tests:
-Modality Count: Test with 1, 2, 3, 4+ modalities per bag
-Modality Combinations: Test with different modality combination patterns
-Modality Balance: Test with balanced vs imbalanced modality distributions
-Modality Quality: Test with high vs low quality modalities
-modality_pattern_robustness_tests = {
-    'modality_counts': [1, 2, 3, 4, 5],
-    'combination_patterns': ['balanced', 'imbalanced', 'single_modality'],
-    'quality_levels': ['high', 'medium', 'low'],
-    'pattern_diversity': True
-}
+5. Performance Prediction Robustness
+Test Name: test_performance_prediction_robustness
+Description: Test robustness of the performance prediction system under different prediction scenarios and parameter configurations
+Implementation:
+def test_performance_prediction_robustness(model, prediction_scenarios):
+    """Test robustness of the performance prediction system."""
+    results = {}
+    
+    for scenario_name, scenario_config in prediction_scenarios.items():
+        # Create model with specific prediction parameters
+        test_model = MultiModalEnsembleModel(
+            n_bags=model.n_bags,
+            dropout_strategy=model.dropout_strategy,
+            optimization_mode=model.optimization_mode,
+            modality_aware=model.modality_aware,
+            base_performance=scenario_config.get('base_performance', 0.6),
+            diversity_bonus=scenario_config.get('diversity_bonus', 0.1),
+            weightage_bonus=scenario_config.get('weightage_bonus', 0.1),
+            dropout_penalty=scenario_config.get('dropout_penalty', 0.1),
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze performance prediction system
+        bag_learner_summary = test_model.get_bag_learner_summary()
+        stage3_interpretability = test_model.get_stage3_interpretability_data()
+        
+        # Calculate performance prediction robustness metrics
+        prediction_metrics = calculate_performance_prediction_robustness(
+            bag_learner_summary, stage3_interpretability
+        )
+        
+        results[scenario_name] = {
+            'scenario_config': scenario_config,
+            'bag_learner_summary': bag_learner_summary,
+            'stage3_interpretability': stage3_interpretability,
+            'prediction_metrics': prediction_metrics,
+            'robustness_score': calculate_performance_prediction_robustness_score(prediction_metrics)
+        }
+    
+    return results
+Test Scenarios:
+Prediction Parameter Variation: Test with different base_performance, diversity_bonus, weightage_bonus, dropout_penalty values
+Prediction Accuracy: Test prediction accuracy across different bag configurations
+Prediction Stability: Test prediction stability across multiple runs
+Prediction Calibration: Test if predictions are well-calibrated with actual performance
+Robustness Questions:
+How robust is the performance prediction to parameter changes?
+Does the performance prediction maintain accuracy across different bag configurations?
+How stable are performance predictions across multiple runs?
+What's the impact of prediction parameters on prediction quality?
 
-5. Validation Strategy Robustness
-Purpose: Test robustness to different validation strategies
-Tests:
-Validation Methods: Test with cross_validation, holdout, none validation strategies
-Validation Impact: Compare performance with/without validation
-Validation Efficiency: Test time cost vs accuracy benefit
-Validation Consistency: Test consistency across different validation methods
-validation_strategy_robustness_tests = {
-    'validation_methods': ['cross_validation', 'holdout', 'none'],
-    'impact_analysis': True,
-    'efficiency_analysis': True,
-    'consistency_testing': True
-}
+6. Ensemble Size Robustness
+Test Name: test_ensemble_size_robustness
+Description: Test robustness of the learner selection system under different ensemble sizes and scaling scenarios
+Implementation:
+def test_ensemble_size_robustness(model, size_scenarios):
+    """Test robustness of the learner selection system across different ensemble sizes."""
+    results = {}
+    
+    for scenario_name, scenario_config in size_scenarios.items():
+        # Create model with specific ensemble size
+        test_model = MultiModalEnsembleModel(
+            n_bags=scenario_config.get('n_bags', 10),
+            dropout_strategy=model.dropout_strategy,
+            optimization_mode=model.optimization_mode,
+            modality_aware=model.modality_aware,
+            bag_learner_pairing=model.bag_learner_pairing,
+            random_state=model.random_state,
+            verbose=False
+        )
+        
+        test_model.fit(model.train_data, model.train_labels)
+        
+        # Analyze ensemble size impact
+        bag_learner_summary = test_model.get_bag_learner_summary()
+        pairing_stats = test_model.get_pairing_statistics()
+        ensemble_coherence = test_model.get_ensemble_coherence()
+        
+        # Calculate ensemble size robustness metrics
+        size_metrics = calculate_ensemble_size_robustness(
+            bag_learner_summary, pairing_stats, ensemble_coherence
+        )
+        
+        results[scenario_name] = {
+            'scenario_config': scenario_config,
+            'bag_learner_summary': bag_learner_summary,
+            'pairing_statistics': pairing_stats,
+            'ensemble_coherence': ensemble_coherence,
+            'size_metrics': size_metrics,
+            'robustness_score': calculate_ensemble_size_robustness_score(size_metrics)
+        }
+    
+    return results
+Test Scenarios:
+Small Ensemble Robustness: Test with 3-5 bags
+Medium Ensemble Robustness: Test with 10-20 bags
+Large Ensemble Robustness: Test with 50-100 bags
+Scaling Analysis: Analyze how learner selection quality scales with ensemble size
+Robustness Questions:
+How robust is the learner selection to different ensemble sizes?
+Does the learner selection maintain quality across different scaling scenarios?
+How does ensemble size affect learner selection consistency?
+What's the impact of ensemble size on computational efficiency?
 
-6. Task Type Robustness
-Purpose: Test robustness to different task types
-Tests:
-Task Type Detection: Test with classification, regression, auto task types
-Task Type Performance: Compare learner selection across task types
-Task Type Adaptation: Test if task type affects learner selection patterns
-Task Type Consistency: Verify consistent selection within same task type
-task_type_robustness_tests = {
-    'task_types': ['classification', 'regression', 'auto'],
-    'performance_comparison': True,
-    'adaptation_analysis': True,
-    'consistency_testing': True
-}
-
-7. Random Seed Robustness
-Purpose: Test stability across different random seeds
-Tests:
-Seed Stability: Test with 10+ different random seeds
-Reproducibility: Verify results are consistent across seeds
-Seed Sensitivity: Measure variance in learner selection across seeds
-Seed Impact: Test if seed affects learner selection patterns
-random_seed_robustness_tests = {
-    'seed_values': [42, 123, 456, 789, 101, 202, 303, 404, 505, 606],
-    'reproducibility_testing': True,
-    'sensitivity_analysis': True,
-    'impact_analysis': True
-}
-
-8. Data Quality Robustness
-Purpose: Test robustness to different data quality scenarios
-Tests:
-Data Quality Levels: Test with high, medium, low quality data
-Noise Robustness: Test with different noise levels (0%, 5%, 10%, 20%)
-Missing Data Robustness: Test with different missing data patterns
-Data Distribution Robustness: Test with different data distributions
-data_quality_robustness_tests = {
-    'quality_levels': ['high', 'medium', 'low'],
-    'noise_levels': [0.0, 0.05, 0.1, 0.2],
-    'missing_data_patterns': ['random', 'systematic', 'modality_specific'],
-    'distribution_types': ['normal', 'uniform', 'skewed']
-}
-
-9. Ensemble Size Robustness
-Purpose: Test how learner selection scales with different ensemble sizes
-Tests:
-Small Ensemble: Test with 3, 5, 8 bags
-Large Ensemble: Test with 15, 20, 30 bags
-Selection Scalability: Test if selection quality scales with ensemble size
-Computational Efficiency: Measure selection time vs ensemble size
-ensemble_size_robustness_tests = {
-    'ensemble_sizes': [3, 5, 8, 15, 20, 30],
-    'scalability_analysis': True,
-    'efficiency_analysis': True,
-    'quality_scaling': True
-}
-
-10. Hyperparameter Robustness
-Purpose: Test robustness to different hyperparameter configurations
-Tests:
-Hyperparameter Ranges: Test with different hyperparameter value ranges
-Hyperparameter Sensitivity: Test sensitivity to hyperparameter changes
-Hyperparameter Interactions: Test interactions between different hyperparameters
-Hyperparameter Optimization: Test if hyperparameter tuning improves selection
-hyperparameter_robustness_tests = {
-    'hyperparameter_ranges': {
-        'performance_threshold': [0.3, 0.5, 0.7, 0.9],
-        'validation_strategy': ['cross_validation', 'holdout', 'none'],
-        'optimization_strategy': ['balanced', 'accuracy', 'speed', 'memory']
-    },
-    'sensitivity_analysis': True,
-    'interaction_testing': True,
-    'optimization_analysis': True
-}
-
-Stage 4
+Stage 4 
 
 //summary
-Core Training Architecture
-Stage 4 represents the heart of the multimodal ensemble training process, where the carefully selected base learners from Stage 3 are trained on their respective data bags generated in Stage 2. This stage implements a sophisticated training pipeline that goes far beyond simple model training, incorporating advanced techniques like cross-modal denoising, adaptive optimization strategies, and comprehensive monitoring systems. The training pipeline is designed to handle both PyTorch-based neural networks and scikit-learn-based traditional machine learning models, providing a unified interface that can seamlessly switch between different learning paradigms based on the selected base learners.
-Cross-Modal Denoising System
-One of the most innovative aspects of Stage 4 is the implementation of a comprehensive cross-modal denoising system that addresses the inherent noise and inconsistencies present in multimodal data. This system employs multiple denoising objectives including reconstruction-based denoising (where models learn to reconstruct clean representations from noisy inputs), alignment-based denoising (ensuring consistent representations across modalities), consistency-based denoising (maintaining semantic consistency), and information-theoretic denoising (preserving essential information while removing noise). The denoising system adapts dynamically during training, adjusting the denoising weights and strategies based on the model's performance and the data characteristics, ensuring optimal noise reduction without losing critical information.
-Advanced Optimization and Scheduling
-The training pipeline incorporates state-of-the-art optimization techniques including multiple optimizer options (AdamW, Adam, SGD, RMSprop) with adaptive learning rate scheduling strategies such as cosine annealing with restarts, one-cycle learning, plateau-based reduction, and step-based decay. The system supports mixed precision training for computational efficiency, gradient clipping for training stability, and gradient accumulation for handling large batch sizes effectively. Early stopping mechanisms prevent overfitting while label smoothing techniques improve generalization. The pipeline also includes comprehensive logging and monitoring systems that track training progress, performance metrics, and resource utilization in real-time.
-Adaptive Training Strategies
-Stage 4 implements several adaptive training strategies that adjust the training process based on the specific characteristics of each data bag and its associated base learner. Progressive learning techniques gradually increase training complexity, while adaptive batch sizing adjusts batch sizes based on available memory and computational resources. The system includes distributed training support for scaling across multiple devices and comprehensive model compilation optimizations for enhanced performance. Cross-validation integration allows for robust model validation during training, while advanced monitoring systems track convergence patterns and automatically adjust training parameters when needed.
-Integration and Output
-The training pipeline seamlessly integrates with the previous stages, taking the data bags from Stage 2 and the selected base learners from Stage 3, and produces trained models ready for ensemble prediction in Stage 5. Each trained model retains metadata about its training process, including performance metrics, convergence patterns, and the characteristics of the data it was trained on. The system ensures that all trained models are properly serialized and can be efficiently loaded for inference, while maintaining comprehensive audit trails of the training process for reproducibility and analysis. The output of Stage 4 provides the foundation for the ensemble prediction system, with each trained model contributing its specialized knowledge to the final ensemble decision-making process.
+Stage 4: Base Learner Training orchestrates the training of all weak learners assigned to ensemble bags through a sophisticated multi-step pipeline. The stage begins by creating an EnsembleTrainingPipeline with an AdvancedTrainingConfig that specifies training parameters including epochs, batch size, learning rate, weight decay, optimizer type (AdamW, SGD, Adam), and scheduler type (cosine annealing, one-cycle, reduce-on-plateau). The core train_ensemble() method iterates through each bag-learner configuration, creating specialized learner instances (TabularLearner, TextLearner, ImageLearner, FusionLearner) based on the assigned learner type from Stage 3. For each learner, the training process implements comprehensive overfitting prevention through early stopping with configurable patience, weight decay (L2 regularization), learning rate scheduling with warm restarts, gradient clipping to prevent exploding gradients, and validation-based training with configurable validation splits. The stage also includes advanced features like data augmentation (modality-specific text augmentation, image transformations, audio noise injection, and tabular feature perturbation), batch normalization for stable training, cross-validation with K-fold splits for robust evaluation, gradient accumulation for effective large batch training, progressive learning with curriculum stages, and comprehensive metrics tracking including training/validation loss, accuracy, and performance metrics. Each trained learner is wrapped in a TrainedLearnerInfo dataclass containing the trained model, modality weights, training metrics, and final performance score, with all results stored in memory for Stage 5 integration. The stage ensures ensemble diversity through the varied bag configurations from Stage 2 while maintaining training quality through multiple overfitting prevention mechanisms and comprehensive performance monitoring.
 
 //novel features
-1. Cross-Modal Denoising System ✅ (You mentioned this one)
-The comprehensive cross-modal denoising system with multiple objectives (reconstruction, alignment, consistency, information-theoretic) and adaptive denoising strategies.
-2. Adaptive Progressive Learning Framework
-A novel progressive learning system that dynamically adjusts training complexity based on model performance and data characteristics. Unlike traditional progressive learning that follows fixed schedules, this system adapts the learning progression in real-time, starting with simpler tasks and gradually increasing complexity only when the model demonstrates readiness. The framework includes adaptive difficulty scaling, where the system monitors learning curves and automatically adjusts the complexity of training examples, ensuring optimal learning progression without overwhelming the model.
-3. Multi-Modal Gradient Synchronization
-An innovative gradient synchronization mechanism that coordinates training across different modalities within the same model. This system ensures that gradients from different modalities are properly balanced and synchronized, preventing any single modality from dominating the learning process. It includes gradient normalization techniques, modality-specific learning rate adaptation, and cross-modal gradient alignment that maintains semantic consistency while allowing each modality to contribute optimally to the overall learning objective.
-4. Dynamic Resource-Aware Training
-A sophisticated resource management system that dynamically adjusts training parameters based on available computational resources, memory constraints, and performance requirements. This system includes adaptive batch sizing that scales based on available memory, dynamic model compilation that optimizes for the specific hardware configuration, and intelligent resource allocation that prioritizes critical training components. The system can automatically switch between different training modes (e.g., from full precision to mixed precision) based on resource availability and performance requirements.
-5. Cross-Modal Consistency Regularization
-A novel regularization technique that enforces consistency across different modalities during training, ensuring that the model learns coherent representations that align across modalities. This goes beyond simple alignment by implementing consistency constraints that maintain semantic coherence while allowing for modality-specific variations. The system includes consistency loss functions, cross-modal attention mechanisms, and adaptive consistency weighting that adjusts based on the reliability of each modality.
-6. Adaptive Early Stopping with Performance Prediction
-An intelligent early stopping system that uses performance prediction models to determine optimal stopping points. Unlike traditional early stopping that relies on simple validation metrics, this system employs machine learning models to predict future performance trends and automatically determines the best stopping point. It includes performance trajectory analysis, convergence pattern recognition, and adaptive patience mechanisms that adjust based on the specific characteristics of each training run.
-7. Multi-Objective Training Optimization
-A comprehensive multi-objective optimization framework that simultaneously optimizes multiple training objectives (accuracy, efficiency, robustness, interpretability) rather than focusing on a single metric. This system includes Pareto-optimal solution finding, dynamic objective weighting based on training progress, and adaptive objective prioritization that shifts focus between different goals as training progresses. The framework ensures that the final model achieves a balanced performance across all important dimensions.
-8. Cross-Modal Knowledge Distillation
-An innovative knowledge distillation system that enables knowledge transfer between different modalities and model architectures. This system allows smaller, more efficient models to learn from larger, more complex models while maintaining performance. It includes cross-modal distillation techniques, architecture-agnostic knowledge transfer, and adaptive distillation weighting that ensures optimal knowledge transfer without performance degradation.
-9. Dynamic Model Architecture Adaptation
-A system that can dynamically modify model architectures during training based on performance feedback and data characteristics. This includes adaptive layer addition/removal, dynamic attention mechanism adjustment, and real-time architecture optimization that ensures the model structure evolves to best suit the specific training data and objectives. The system maintains training continuity while allowing for architectural improvements.
-10. Comprehensive Training Audit and Reproducibility System
-An advanced audit system that maintains complete records of the training process, including hyperparameter evolution, performance trajectories, and decision points. This system ensures full reproducibility while providing insights into training dynamics. It includes automated experiment tracking, performance attribution analysis, and comprehensive logging that captures not just what happened, but why it happened and how it could be improved.
+1. Advanced Cross-Modal Denoising Loss
+The AdvancedCrossModalDenoisingLoss class implements a novel multi-objective denoising framework that operates during ensemble training through a sophisticated forward pass mechanism. The implementation begins with the __init__ method that initializes reconstruction loss (MSE) and consistency loss (KL divergence) modules, followed by the core forward method that processes each modality's data through the learner and applies configurable denoising objectives including reconstruction (predicting modality data from itself), consistency (maintaining representation consistency across modalities), and alignment (ensuring cross-modal feature alignment). The loss calculation iterates through each modality, computes modality-specific reconstruction losses by comparing learner predictions to original data, applies consistency losses using KL divergence between predicted and original representations, and aggregates all losses with configurable weighting (denoising_weight). The function returns both the total denoising loss and a detailed breakdown of per-modality losses, enabling fine-grained monitoring of cross-modal denoising effectiveness during training.
+2. Comprehensive Modal-Specific Training Metrics
+The ComprehensiveTrainingMetrics dataclass implements novel granular performance tracking through a comprehensive metrics collection system that captures both traditional and modal-specific performance indicators. The implementation tracks standard metrics (epoch, train_loss, val_loss, accuracy, f1_score, mse) alongside novel modal-specific metrics including modal_reconstruction_loss (dictionary storing reconstruction loss per modality), modal_alignment_score (cross-modal alignment quality per modality), and modal_consistency_score (overall consistency across modalities). The metrics collection occurs during the training loop where each epoch's performance is captured, modal-specific losses are extracted from the denoising loss function, alignment scores are computed between modality representations, and consistency scores are calculated using cross-modal similarity measures. The system also tracks training efficiency metrics (training_time, memory_usage, learning_rate) and stores all metrics in a structured format that enables detailed analysis of how each modality contributes to overall ensemble performance.
+3. Bag-Aware Training with Modality Characteristics Preservation
+The TrainedLearnerInfo dataclass implements novel bag-model integration by preserving complete modality characteristics alongside trained models through a comprehensive information storage system. The implementation begins with the train_ensemble method that processes each bag-learner configuration, extracts modality masks and weights from the BagLearnerConfig objects created in Stage 3, and maintains these characteristics throughout the training process. During training, the system preserves the modality_mask (which modalities were active during bag creation), modality_weights (importance scores calculated in Stage 3), and bag_id (unique identifier linking back to Stage 2 bag generation). After training completion, the TrainedLearnerInfo object is created containing the trained model, preserved modality characteristics, training metrics history, and final performance score, creating a complete audit trail. This novel approach enables full traceability from bag generation through learner selection to final trained model, allowing analysis of how specific modality configurations and weightages influenced each model's training and performance, which is uncommon in ensemble literature where this level of bag-model integration is typically not maintained.
 
 //hyperparameters
 🎯 CORE TRAINING HYPERPARAMETERS
-1. epochs
-Description: Number of training epochs for each base learner, controlling how many times the model sees the entire training dataset
-Range: [1, 2, 5, 10, 20, 50, 100, 200]
-Default: 10
-Testing: VARY - Critical for training effectiveness
-2. batch_size
-Description: Number of samples processed in each training batch, affecting memory usage and training stability
-Range: [8, 16, 32, 64, 128, 256, 512]
+epochs
+Description: Number of training epochs for base learners
+Range: [25, 50, 100]
+Default: 50
+Testing: VARY - Key parameter for training duration and convergence
+learning_rate
+Description: Learning rate for optimizer
+Range: [1e-4, 5e-4, 1e-3]
+Default: 5e-4
+Testing: VARY - Critical for convergence and performance
+batch_size
+Description: Batch size for training base learners
+Range: [32, 64, 128]
 Default: 32
-Testing: VARY - Impacts training efficiency and convergence
-3. learning_rate
-Description: Initial learning rate for the optimizer, controlling the step size during gradient descent
-Range: [0.0001, 0.001, 0.01, 0.1, 0.5]
-Default: 0.001
-Testing: VARY - Critical for convergence speed and stability
-⚙️ OPTIMIZER HYPERPARAMETERS
-4. optimizer_type
-Description: Optimization algorithm used for training - AdamW for adaptive learning, Adam for general use, SGD for stability, RMSprop for RNNs
-Range: ['adamw', 'adam', 'sgd', 'rmsprop']
-Default: 'adamw'
-Testing: VARY - Different optimizers suit different data types
-5. optimizer_weight_decay
-Description: L2 regularization strength applied to model weights to prevent overfitting
-Range: [0.0, 0.0001, 0.001, 0.01, 0.1]
-Default: 0.01
-Testing: VARY - Controls regularization strength
-6. optimizer_momentum
-Description: Momentum factor for SGD optimizer, helping accelerate convergence and escape local minima
-Range: [0.0, 0.5, 0.9, 0.95, 0.99]
-Default: 0.9
-Testing: VARY - Affects SGD convergence behavior
-�� SCHEDULER HYPERPARAMETERS
-7. scheduler_type
-Description: Learning rate scheduling strategy - cosine_restarts for cyclical learning, onecycle for fast training, plateau for adaptive reduction
-Range: ['cosine_restarts', 'onecycle', 'plateau', 'step', 'none']
-Default: 'cosine_restarts'
-Testing: VARY - Different schedules suit different training scenarios
-8. scheduler_patience
-Description: Number of epochs to wait before reducing learning rate when using plateau scheduler
-Range: [3, 5, 10, 15, 20]
+Testing: VARY - Affects training stability and memory usage
+🎯 OVERFITTING PREVENTION HYPERPARAMETERS
+early_stopping_patience
+Description: Patience for early stopping
+Range: [5, 10, 15]
 Default: 10
-Testing: VARY - Controls scheduler sensitivity
-9. scheduler_factor
-Description: Factor by which learning rate is reduced when scheduler triggers
-Range: [0.1, 0.2, 0.5, 0.8]
-Default: 0.5
-Testing: VARY - Controls learning rate reduction magnitude
-�� CROSS-MODAL DENOISING HYPERPARAMETERS
-10. enable_denoising
-Description: Enables the cross-modal denoising system that reduces noise and improves consistency across modalities
-Range: [True, False]
-Default: True
-Testing: FIXED - Always keep True (core novel feature)
-11. denoising_weight
-Description: Weight of the denoising loss relative to the main task loss, controlling the balance between denoising and primary learning
-Range: [0.0, 0.1, 0.2, 0.5, 1.0, 2.0]
+Testing: VARY - Affects training termination
+dropout_rate
+Description: Dropout rate for regularization
+Range: [0.1, 0.2, 0.3]
 Default: 0.2
-Testing: VARY - Critical for denoising effectiveness
-12. denoising_strategy
-Description: Denoising strategy type - adaptive adjusts weights dynamically, fixed uses constant weights, progressive increases over time
-Range: ['adaptive', 'fixed', 'progressive']
-Default: 'adaptive'
-Testing: VARY - Tests different denoising approaches
-13. denoising_objectives
-Description: Types of denoising objectives to use - reconstruction for learning clean representations, alignment for cross-modal consistency
-Range: ['reconstruction', 'alignment', 'consistency', 'information', 'all']
-Default: 'all'
-Testing: VARY - Tests different denoising objectives
-⚡ ADVANCED TRAINING HYPERPARAMETERS
-14. mixed_precision
-Description: Enables mixed precision training using FP16 for faster training and reduced memory usage
-Range: [True, False]
-Default: False
-Testing: FIXED - Keep False for stability
-15. gradient_clipping
-Description: Enables gradient clipping to prevent exploding gradients and improve training stability
+Testing: VARY - Affects overfitting prevention
+�� CROSS-MODAL DENOISING HYPERPARAMETERS (NOVEL FEATURE)
+enable_denoising
+Description: Enable cross-modal denoising system
 Range: [True, False]
 Default: True
-Testing: FIXED - Keep True for stability
-16. gradient_clip_value
-Description: Maximum gradient norm before clipping is applied
-Range: [0.5, 1.0, 2.0, 5.0, 10.0]
-Default: 1.0
-Testing: FIXED - Keep 1.0 (standard value)
-17. early_stopping_patience
-Description: Number of epochs to wait before stopping training if validation performance doesn't improve
-Range: [5, 10, 15, 20, 30]
-Default: 15
-Testing: VARY - Controls overfitting prevention
-18. label_smoothing
-Description: Label smoothing factor to improve generalization by preventing overconfident predictions
-Range: [0.0, 0.1, 0.2, 0.3]
+Testing: VARY - Key parameter for ablation studies
+denoising_weight
+Description: Weight for denoising loss in total loss
+Range: [0.05, 0.1, 0.2]
 Default: 0.1
-Testing: VARY - Tests generalization improvement
-�� VALIDATION AND MONITORING HYPERPARAMETERS
-19. validation_split
-Description: Fraction of training data to use for validation during training
-Range: [0.1, 0.2, 0.3, 0.4]
-Default: 0.2
-Testing: FIXED - Keep 0.2 (standard split)
-20. cv_folds
-Description: Number of cross-validation folds for robust model evaluation
-Range: [3, 5, 10]
-Default: 5
-Testing: FIXED - Keep 5 (standard CV)
-21. monitor_metric
-Description: Primary metric to monitor during training for early stopping and model selection
-Range: ['accuracy', 'f1_score', 'loss', 'val_loss']
-Default: 'val_loss'
-Testing: FIXED - Keep 'val_loss' (standard monitoring)
-🚀 PERFORMANCE OPTIMIZATION HYPERPARAMETERS
-22. gradient_accumulation_steps
-Description: Number of gradient accumulation steps before performing optimizer update, effective for large batch sizes
-Range: [1, 2, 4, 8, 16]
+Testing: VARY - Affects denoising contribution
+denoising_strategy
+Description: Strategy for adaptive denoising
+Range: ['adaptive', 'fixed']
+Default: 'adaptive'
+Testing: VARY - Novel feature testing
+�� MODAL-SPECIFIC METRICS TRACKING HYPERPARAMETERS (NOVEL FEATURE)
+modal_specific_tracking
+Description: Enable modal-specific metrics tracking
+Range: [True, False]
+Default: True
+Testing: VARY - Key parameter for ablation studies
+track_modal_reconstruction
+Description: Track reconstruction loss per modality
+Range: [True, False]
+Default: True
+Testing: VARY - Affects tracking granularity
+🎯 BAG CHARACTERISTICS PRESERVATION HYPERPARAMETERS (NOVEL FEATURE)
+preserve_bag_characteristics
+Description: Enable bag characteristics preservation
+Range: [True, False]
+Default: True
+Testing: VARY - Key parameter for ablation studies
+�� FIXED PARAMETERS (DON'T VARY)
+weight_decay
+Description: L2 regularization weight decay
+Range: 1e-3
+Default: 1e-3
+Testing: FIXED - Standard value
+optimizer_type
+Description: Type of optimizer for training
+Range: 'adamw'
+Default: 'adamw'
+Testing: FIXED - Best performer
+scheduler_type
+Description: Learning rate scheduler type
+Range: 'cosine_restarts'
+Default: 'cosine_restarts'
+Testing: FIXED - Best performer
+gradient_accumulation_steps
+Description: Number of steps for gradient accumulation
+Range: 1
 Default: 1
-Testing: FIXED - Keep 1 (standard training)
-23. amp_optimization
-Description: Enables Automatic Mixed Precision optimization for faster training
-Range: [True, False]
+Testing: FIXED - Standard value
+gradient_clipping
+Description: Gradient clipping threshold
+Range: 1.0
+Default: 1.0
+Testing: FIXED - Standard value
+label_smoothing
+Description: Label smoothing factor
+Range: 0.1
+Default: 0.1
+Testing: FIXED - Standard value
+denoising_objectives
+Description: Denoising objectives to use
+Range: ['reconstruction', 'alignment']
+Default: ['reconstruction', 'alignment']
+Testing: FIXED - Standard combination
+denoising_modalities
+Description: Specific modalities to apply denoising to
+Range: []
+Default: []
+Testing: FIXED - All modalities
+track_modal_alignment
+Description: Track alignment score per modality
+Range: True
+Default: True
+Testing: FIXED - Standard tracking
+track_modal_consistency
+Description: Track consistency score per modality
+Range: True
+Default: True
+Testing: FIXED - Standard tracking
+modal_tracking_frequency
+Description: Frequency of modal-specific tracking
+Range: 'every_epoch'
+Default: 'every_epoch'
+Testing: FIXED - Standard frequency
+track_only_primary_modalities
+Description: Track only primary modalities
+Range: False
 Default: False
-Testing: FIXED - Keep False for stability
-24. progressive_learning
-Description: Enables progressive learning where training complexity increases over time
-Range: [True, False]
+Testing: FIXED - Track all modalities
+save_modality_mask
+Description: Save modality mask for each bag
+Range: True
+Default: True
+Testing: FIXED - Standard preservation
+save_modality_weights
+Description: Save modality weights for each bag
+Range: True
+Default: True
+Testing: FIXED - Standard preservation
+save_bag_id
+Description: Save bag ID for traceability
+Range: True
+Default: True
+Testing: FIXED - Standard preservation
+save_training_metrics
+Description: Save training metrics history
+Range: True
+Default: True
+Testing: FIXED - Standard preservation
+save_learner_config
+Description: Save learner configuration
+Range: True
+Default: True
+Testing: FIXED - Standard preservation
+preserve_only_primary_modalities
+Description: Preserve only primary modalities
+Range: False
 Default: False
-Testing: VARY - Tests progressive learning effectiveness
-�� LOGGING AND DEBUGGING HYPERPARAMETERS
-25. verbose
-Description: Enables detailed logging of training progress, metrics, and debugging information
-Range: [True, False]
+Testing: FIXED - Preserve all modalities
+enable_data_augmentation
+Description: Enable data augmentation
+Range: False
+Default: False
+Testing: FIXED - Keep simple
+augmentation_strength
+Description: Strength of data augmentation
+Range: 0.1
+Default: 0.1
+Testing: FIXED - Standard value
+use_batch_norm
+Description: Use batch normalization
+Range: True
+Default: True
+Testing: FIXED - Standard value
+enable_cross_validation
+Description: Enable cross-validation
+Range: False
+Default: False
+Testing: FIXED - Keep simple
+cv_folds
+Description: Number of cross-validation folds
+Range: 5
+Default: 5
+Testing: FIXED - Standard value
+random_state
+Description: Random seed for reproducible training
+Range: 42
+Default: 42
+Testing: EXPERIMENT-DEPENDENT - Set based on test run number
+verbose
+Description: Enables detailed training progress logging
+Range: True
 Default: True
 Testing: FIXED - Keep True for monitoring
-26. log_interval
-Description: Number of batches between logging training progress and metrics
-Range: [10, 50, 100, 200]
-Default: 50
-Testing: FIXED - Keep 50 (reasonable logging frequency)
-27. save_checkpoints
-Description: Enables saving model checkpoints during training for recovery and analysis
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for safety
 
 //abalation studies
 1. CROSS-MODAL DENOISING SYSTEM ABLATION STUDY
 Study Name: Cross_Modal_Denoising_System_Ablation
-Feature Being Tested:
-Cross-Modal Denoising System - Your novel comprehensive denoising system that reduces noise and improves consistency across modalities using multiple objectives (reconstruction, alignment, consistency, information-theoretic), rather than training without noise reduction
-Control (Baseline):
-No Denoising: enable_denoising=False, denoising_weight=0.0 - Traditional training without any cross-modal denoising or noise reduction mechanisms
+Feature Being Tested: Advanced Cross-Modal Denoising Loss - Your novel comprehensive denoising system that reduces noise and improves consistency across modalities using multiple objectives (reconstruction, alignment, consistency), rather than training without noise reduction
+Control (Baseline): No Denoising: enable_denoising=False, denoising_weight=0.0 - Traditional training without any cross-modal denoising or noise reduction mechanisms
 Variables for the Study:
 ablation_variables = [
     # Control group (baseline)
     {'name': 'No_Denoising', 'enable_denoising': False, 'denoising_weight': 0.0},
     
     # Treatment group (your novel feature)
-    {'name': 'Reconstruction_Denoising', 'enable_denoising': True, 'denoising_weight': 0.2, 'denoising_objectives': 'reconstruction'},
-    {'name': 'Alignment_Denoising', 'enable_denoising': True, 'denoising_weight': 0.2, 'denoising_objectives': 'alignment'},
-    {'name': 'Consistency_Denoising', 'enable_denoising': True, 'denoising_weight': 0.2, 'denoising_objectives': 'consistency'},
-    {'name': 'Information_Denoising', 'enable_denoising': True, 'denoising_weight': 0.2, 'denoising_objectives': 'information'},
-    {'name': 'All_Denoising_Objectives', 'enable_denoising': True, 'denoising_weight': 0.2, 'denoising_objectives': 'all'},
+    {'name': 'Reconstruction_Denoising', 'enable_denoising': True, 'denoising_weight': 0.1, 'denoising_objectives': ['reconstruction']},
+    {'name': 'Alignment_Denoising', 'enable_denoising': True, 'denoising_weight': 0.1, 'denoising_objectives': ['alignment']},
+    {'name': 'Consistency_Denoising', 'enable_denoising': True, 'denoising_weight': 0.1, 'denoising_objectives': ['consistency']},
+    {'name': 'All_Denoising_Objectives', 'enable_denoising': True, 'denoising_weight': 0.1, 'denoising_objectives': ['reconstruction', 'alignment', 'consistency']},
     
     # Additional denoising variants
-    {'name': 'Adaptive_Denoising_Strategy', 'enable_denoising': True, 'denoising_weight': 0.2, 'denoising_strategy': 'adaptive', 'denoising_objectives': 'all'},
-    {'name': 'Fixed_Denoising_Strategy', 'enable_denoising': True, 'denoising_weight': 0.2, 'denoising_strategy': 'fixed', 'denoising_objectives': 'all'},
-    {'name': 'Progressive_Denoising_Strategy', 'enable_denoising': True, 'denoising_weight': 0.2, 'denoising_strategy': 'progressive', 'denoising_objectives': 'all'},
+    {'name': 'Adaptive_Denoising_Strategy', 'enable_denoising': True, 'denoising_weight': 0.1, 'denoising_strategy': 'adaptive', 'denoising_objectives': ['reconstruction', 'alignment', 'consistency']},
+    {'name': 'Fixed_Denoising_Strategy', 'enable_denoising': True, 'denoising_weight': 0.1, 'denoising_strategy': 'fixed', 'denoising_objectives': ['reconstruction', 'alignment', 'consistency']},
+    {'name': 'High_Denoising_Weight', 'enable_denoising': True, 'denoising_weight': 0.3, 'denoising_objectives': ['reconstruction', 'alignment', 'consistency']},
+    {'name': 'Low_Denoising_Weight', 'enable_denoising': True, 'denoising_weight': 0.05, 'denoising_objectives': ['reconstruction', 'alignment', 'consistency']},
 ]
 
-2. PROGRESSIVE LEARNING FRAMEWORK ABLATION STUDY
-Study Name: Progressive_Learning_Framework_Ablation
-Feature Being Tested:
-Adaptive Progressive Learning System - Your novel progressive learning framework that dynamically adjusts training complexity based on model performance and data characteristics, rather than using fixed complexity training throughout
-Control (Baseline):
-Standard Training: progressive_learning=False - Traditional training with fixed complexity throughout the entire training process
+2. MODAL-SPECIFIC METRICS TRACKING ABLATION STUDY
+Study Name: Modal_Specific_Metrics_Tracking_Ablation
+Feature Being Tested: Comprehensive Modal-Specific Training Metrics - Your novel granular performance tracking system that captures per-modality reconstruction losses, alignment scores, and consistency scores during training, rather than only tracking overall performance metrics
+Control (Baseline): Standard Metrics: modal_specific_tracking=False - Traditional training with only overall performance metrics (accuracy, loss, f1_score) without modal-specific granularity
 Variables for the Study:
 ablation_variables = [
     # Control group (baseline)
-    {'name': 'Standard_Training', 'progressive_learning': False},
+    {'name': 'Standard_Metrics_Only', 'modal_specific_tracking': False, 'track_modal_reconstruction': False, 'track_modal_alignment': False, 'track_modal_consistency': False},
     
     # Treatment group (your novel feature)
-    {'name': 'Progressive_Learning_Enabled', 'progressive_learning': True},
+    {'name': 'Modal_Reconstruction_Tracking', 'modal_specific_tracking': True, 'track_modal_reconstruction': True, 'track_modal_alignment': False, 'track_modal_consistency': False},
+    {'name': 'Modal_Alignment_Tracking', 'modal_specific_tracking': True, 'track_modal_reconstruction': False, 'track_modal_alignment': True, 'track_modal_consistency': False},
+    {'name': 'Modal_Consistency_Tracking', 'modal_specific_tracking': True, 'track_modal_reconstruction': False, 'track_modal_alignment': False, 'track_modal_consistency': True},
+    {'name': 'All_Modal_Specific_Tracking', 'modal_specific_tracking': True, 'track_modal_reconstruction': True, 'track_modal_alignment': True, 'track_modal_consistency': True},
     
-    # Additional progressive learning variants
-    {'name': 'Progressive_Early_Activation', 'progressive_learning': True, 'progressive_start_epoch': 2},
-    {'name': 'Progressive_Late_Activation', 'progressive_learning': True, 'progressive_start_epoch': 5},
-    {'name': 'Progressive_Fast_Ramp', 'progressive_learning': True, 'progressive_ramp_rate': 0.1},
-    {'name': 'Progressive_Slow_Ramp', 'progressive_learning': True, 'progressive_ramp_rate': 0.05},
+    # Additional tracking variants
+    {'name': 'High_Frequency_Modal_Tracking', 'modal_specific_tracking': True, 'track_modal_reconstruction': True, 'track_modal_alignment': True, 'track_modal_consistency': True, 'modal_tracking_frequency': 'every_epoch'},
+    {'name': 'Low_Frequency_Modal_Tracking', 'modal_specific_tracking': True, 'track_modal_reconstruction': True, 'track_modal_alignment': True, 'track_modal_consistency': True, 'modal_tracking_frequency': 'every_5_epochs'},
+    {'name': 'Selective_Modal_Tracking', 'modal_specific_tracking': True, 'track_modal_reconstruction': True, 'track_modal_alignment': True, 'track_modal_consistency': True, 'track_only_primary_modalities': True},
 ]
 
-3. MULTI-OBJECTIVE TRAINING OPTIMIZATION ABLATION STUDY
-Study Name: Multi_Objective_Training_Optimization_Ablation
-Feature Being Tested:
-Multi-Objective Training Optimization - Your novel multi-objective optimization framework that simultaneously optimizes multiple training objectives (accuracy, efficiency, robustness, interpretability), rather than focusing only on single objectives
-Control (Baseline):
-Single-Objective Training: optimization_strategy='accuracy' - Traditional training that optimizes only for accuracy without considering other objectives
+3. BAG-AWARE TRAINING WITH MODALITY CHARACTERISTICS PRESERVATION ABLATION STUDY
+Study Name: Bag_Aware_Training_Modality_Preservation_Ablation
+Feature Being Tested: Bag-Aware Training with Modality Characteristics Preservation - Your novel system that preserves complete bag modality characteristics (modality_mask, modality_weights, bag_id) alongside trained models, creating full traceability from bag generation through learner selection to final trained model
+Control (Baseline): Standard Training: preserve_bag_characteristics=False - Traditional training that only saves the trained model without preserving bag-specific modality characteristics or traceability information
 Variables for the Study:
 ablation_variables = [
     # Control group (baseline)
-    {'name': 'Accuracy_Only', 'optimization_strategy': 'accuracy'},
+    {'name': 'Standard_Training_Only', 'preserve_bag_characteristics': False, 'save_modality_mask': False, 'save_modality_weights': False, 'save_bag_id': False},
     
     # Treatment group (your novel feature)
-    {'name': 'Multi_Objective_Balanced', 'optimization_strategy': 'balanced'},
-    {'name': 'Multi_Objective_Speed', 'optimization_strategy': 'speed'},
-    {'name': 'Multi_Objective_Memory', 'optimization_strategy': 'memory'},
+    {'name': 'Modality_Mask_Preservation', 'preserve_bag_characteristics': True, 'save_modality_mask': True, 'save_modality_weights': False, 'save_bag_id': False},
+    {'name': 'Modality_Weights_Preservation', 'preserve_bag_characteristics': True, 'save_modality_mask': False, 'save_modality_weights': True, 'save_bag_id': False},
+    {'name': 'Bag_ID_Preservation', 'preserve_bag_characteristics': True, 'save_modality_mask': False, 'save_modality_weights': False, 'save_bag_id': True},
+    {'name': 'Full_Bag_Characteristics_Preservation', 'preserve_bag_characteristics': True, 'save_modality_mask': True, 'save_modality_weights': True, 'save_bag_id': True},
     
-    # Additional multi-objective variants
-    {'name': 'Multi_Objective_Low_Weight', 'optimization_strategy': 'balanced', 'multi_objective_weight': 0.1},
-    {'name': 'Multi_Objective_High_Weight', 'optimization_strategy': 'balanced', 'multi_objective_weight': 0.5},
-    {'name': 'Multi_Objective_Adaptive_Weight', 'optimization_strategy': 'balanced', 'multi_objective_weight': 'adaptive'},
-]
-
-4. ADAPTIVE EARLY STOPPING ABLATION STUDY
-Study Name: Adaptive_Early_Stopping_Ablation
-Feature Being Tested:
-Intelligent Early Stopping System - Your novel performance prediction-based early stopping system that uses machine learning models to predict future performance trends and determine optimal stopping points
-Control (Baseline):
-Traditional Early Stopping: early_stopping_type='traditional', early_stopping_patience=15 - Standard early stopping with fixed patience based on validation metrics
-Variables for the Study:
-ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Traditional_Early_Stopping', 'early_stopping_type': 'traditional', 'early_stopping_patience': 15},
-    
-    # Treatment group (your novel feature)
-    {'name': 'Adaptive_Early_Stopping', 'early_stopping_type': 'adaptive', 'early_stopping_patience': 15},
-    
-    # Additional early stopping variants
-    {'name': 'Adaptive_Low_Patience', 'early_stopping_type': 'adaptive', 'early_stopping_patience': 5},
-    {'name': 'Adaptive_High_Patience', 'early_stopping_type': 'adaptive', 'early_stopping_patience': 30},
-    {'name': 'Adaptive_Performance_Prediction', 'early_stopping_type': 'adaptive', 'performance_prediction': True},
-    {'name': 'Adaptive_Convergence_Analysis', 'early_stopping_type': 'adaptive', 'convergence_analysis': True},
-]
-
-5. COMPREHENSIVE NOVEL FEATURES ABLATION STUDY
-Study Name: Comprehensive_Novel_Features_Ablation
-Feature Being Tested:
-All Novel Features Combined - Testing the additive effects and interactions between all your novel Stage 4 features: Cross-Modal Denoising, Progressive Learning, and Multi-Objective Optimization
-Control (Baseline):
-No Novel Features: enable_denoising=False, progressive_learning=False, optimization_strategy='accuracy' - Traditional training without any novel features
-Variables for the Study:
-ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Baseline_No_Novel_Features', 'enable_denoising': False, 'progressive_learning': False, 'optimization_strategy': 'accuracy'},
-    
-    # Individual novel features
-    {'name': 'Denoising_Only', 'enable_denoising': True, 'progressive_learning': False, 'optimization_strategy': 'accuracy'},
-    {'name': 'Progressive_Learning_Only', 'enable_denoising': False, 'progressive_learning': True, 'optimization_strategy': 'accuracy'},
-    {'name': 'Multi_Objective_Only', 'enable_denoising': False, 'progressive_learning': False, 'optimization_strategy': 'balanced'},
-    
-    # Pairwise combinations
-    {'name': 'Denoising_Plus_Progressive', 'enable_denoising': True, 'progressive_learning': True, 'optimization_strategy': 'accuracy'},
-    {'name': 'Denoising_Plus_Multi_Objective', 'enable_denoising': True, 'progressive_learning': False, 'optimization_strategy': 'balanced'},
-    {'name': 'Progressive_Plus_Multi_Objective', 'enable_denoising': False, 'progressive_learning': True, 'optimization_strategy': 'balanced'},
-    
-    # All novel features combined
-    {'name': 'All_Novel_Features_Combined', 'enable_denoising': True, 'progressive_learning': True, 'optimization_strategy': 'balanced'},
+    # Additional preservation variants
+    {'name': 'Extended_Bag_Metadata_Preservation', 'preserve_bag_characteristics': True, 'save_modality_mask': True, 'save_modality_weights': True, 'save_bag_id': True, 'save_training_metrics': True, 'save_learner_config': True},
+    {'name': 'Minimal_Bag_Preservation', 'preserve_bag_characteristics': True, 'save_modality_mask': True, 'save_modality_weights': True, 'save_bag_id': True, 'save_training_metrics': False, 'save_learner_config': False},
+    {'name': 'Selective_Modality_Preservation', 'preserve_bag_characteristics': True, 'save_modality_mask': True, 'save_modality_weights': True, 'save_bag_id': True, 'preserve_only_primary_modalities': True},
 ]
 
 //inteperetablity test
-1. Cross-Modal Denoising Effectiveness Analysis
-def analyze_cross_modal_denoising_effectiveness(model):
-    """Analyze effectiveness of cross-modal denoising system"""
-    training_metrics = model.get_training_metrics()
-    
-    denoising_metrics = training_metrics['denoising_metrics']
-    
-    return {
-        'denoising_loss_progression': denoising_metrics['denoising_loss_progression'],
-        'reconstruction_accuracy': denoising_metrics['reconstruction_accuracy'],
-        'alignment_consistency': denoising_metrics['alignment_consistency'],
-        'information_preservation': denoising_metrics['information_preservation'],
-        'denoising_effectiveness_score': denoising_metrics['overall_effectiveness']
-    }
+1. CROSS-MODAL DENOISING SYSTEM INTERPRETABILITY TEST
+Test Name: Cross_Modal_Denoising_Effectiveness_Analysis
+Feature Being Tested: Advanced Cross-Modal Denoising Loss - Your novel comprehensive denoising system that reduces noise and improves consistency across modalities using multiple objectives (reconstruction, alignment, consistency)
 Interpretability Questions:
 How effective is the cross-modal denoising system?
 Which denoising objectives contribute most to performance?
 How does denoising loss change during training?
 What's the trade-off between denoising and main task performance?
-
-2. Progressive Learning Behavior Analysis
-def analyze_progressive_learning_behavior(model):
-    """Analyze how progressive learning adapts during training"""
-    training_metrics = model.get_training_metrics()
+Which modalities benefit most from denoising?
+How does adaptive denoising strategy compare to fixed strategies?
+Analysis Functions:
+def analyze_cross_modal_denoising_effectiveness(model):
+    """Analyze effectiveness of cross-modal denoising system"""
+    trained_learners = model.get_trained_learners()
     
-    progressive_metrics = training_metrics['progressive_learning_metrics']
-    
-    return {
-        'complexity_progression': progressive_metrics['complexity_progression'],
-        'learning_rate_adaptation': progressive_metrics['learning_rate_adaptation'],
-        'difficulty_scaling': progressive_metrics['difficulty_scaling'],
-        'progressive_effectiveness': progressive_metrics['effectiveness_score'],
-        'convergence_patterns': progressive_metrics['convergence_patterns']
+    denoising_analysis = {
+        'denoising_loss_progression': {},
+        'reconstruction_accuracy': {},
+        'alignment_consistency': {},
+        'consistency_scores': {},
+        'denoising_effectiveness_score': {},
+        'objective_contribution': {},
+        'modality_benefit_analysis': {}
     }
-Interpretability Questions:
-How does training complexity evolve over time?
-When does the progressive learning system activate?
-How does progressive learning affect convergence speed?
-What's the optimal complexity progression pattern?
+    
+    for learner_info in trained_learners:
+        bag_id = learner_info.bag_id
+        metrics = learner_info.training_metrics
+        
+        # Extract denoising metrics from training history
+        denoising_losses = [m.modal_reconstruction_loss for m in metrics]
+        alignment_scores = [m.modal_alignment_score for m in metrics]
+        consistency_scores = [m.modal_consistency_score for m in metrics]
+        
+        denoising_analysis['denoising_loss_progression'][bag_id] = denoising_losses
+        denoising_analysis['reconstruction_accuracy'][bag_id] = alignment_scores
+        denoising_analysis['alignment_consistency'][bag_id] = consistency_scores
+        denoising_analysis['consistency_scores'][bag_id] = consistency_scores
+        
+        # Calculate effectiveness scores
+        final_denoising_loss = denoising_losses[-1] if denoising_losses else {}
+        final_alignment = alignment_scores[-1] if alignment_scores else {}
+        final_consistency = consistency_scores[-1] if consistency_scores else 0.0
+        
+        denoising_analysis['denoising_effectiveness_score'][bag_id] = {
+            'reconstruction_effectiveness': 1.0 - np.mean(list(final_denoising_loss.values())) if final_denoising_loss else 0.0,
+            'alignment_effectiveness': np.mean(list(final_alignment.values())) if final_alignment else 0.0,
+            'consistency_effectiveness': final_consistency,
+            'overall_effectiveness': 0.0  # Will be calculated
+        }
+    
+    return denoising_analysis
 
-3. Multi-Objective Optimization Analysis
-def analyze_multi_objective_optimization(model):
-    """Analyze multi-objective optimization trade-offs"""
-    training_metrics = model.get_training_metrics()
+2. MODAL-SPECIFIC METRICS TRACKING INTERPRETABILITY TEST
+Test Name: Modal_Specific_Metrics_Granularity_Analysis
+Feature Being Tested: Comprehensive Modal-Specific Training Metrics - Your novel granular performance tracking system that captures per-modality reconstruction losses, alignment scores, and consistency scores during training
+Interpretability Questions:
+How do different modalities perform during training?
+Which modalities show the most improvement over time?
+What's the correlation between modal-specific metrics and overall performance?
+How does modal tracking frequency affect interpretability?
+Which modalities are most critical for ensemble performance?
+How do modal-specific metrics vary across different bag configurations?
+Analysis Functions:
+def analyze_modal_specific_metrics_granularity(model):
+    """Analyze granularity and insights from modal-specific metrics tracking"""
+    trained_learners = model.get_trained_learners()
     
-    multi_objective_metrics = training_metrics['multi_objective_metrics']
-    
-    return {
-        'objective_weights': multi_objective_metrics['objective_weights'],
-        'pareto_frontier': multi_objective_metrics['pareto_frontier'],
-        'objective_tradeoffs': multi_objective_metrics['tradeoff_analysis'],
-        'optimization_balance': multi_objective_metrics['balance_score'],
-        'objective_prioritization': multi_objective_metrics['prioritization_pattern']
+    modal_analysis = {
+        'modal_performance_progression': {},
+        'modal_improvement_rates': {},
+        'modal_correlation_analysis': {},
+        'critical_modality_identification': {},
+        'tracking_frequency_impact': {},
+        'bag_configuration_modal_variation': {}
     }
-Interpretability Questions:
-How are different objectives weighted during training?
-What's the Pareto-optimal solution space?
-How do accuracy, efficiency, and robustness trade off?
-Which objectives are prioritized at different training stages?
+    
+    # Collect modal-specific metrics across all learners
+    all_modal_metrics = {}
+    for learner_info in trained_learners:
+        bag_id = learner_info.bag_id
+        modality_mask = learner_info.modality_mask
+        metrics = learner_info.training_metrics
+        
+        # Extract modal-specific data
+        for epoch_metrics in metrics:
+            epoch = epoch_metrics.epoch
+            if epoch not in all_modal_metrics:
+                all_modal_metrics[epoch] = {}
+            
+            # Process reconstruction losses per modality
+            for modality, loss in epoch_metrics.modal_reconstruction_loss.items():
+                if modality not in all_modal_metrics[epoch]:
+                    all_modal_metrics[epoch][modality] = {'reconstruction': [], 'alignment': [], 'consistency': []}
+                all_modal_metrics[epoch][modality]['reconstruction'].append(loss)
+            
+            # Process alignment scores per modality
+            for modality, score in epoch_metrics.modal_alignment_score.items():
+                if modality not in all_modal_metrics[epoch]:
+                    all_modal_metrics[epoch][modality] = {'reconstruction': [], 'alignment': [], 'consistency': []}
+                all_modal_metrics[epoch][modality]['alignment'].append(score)
+    
+    # Analyze modal performance progression
+    for modality in all_modal_metrics[0].keys():
+        reconstruction_progression = []
+        alignment_progression = []
+        
+        for epoch in sorted(all_modal_metrics.keys()):
+            if modality in all_modal_metrics[epoch]:
+                reconstruction_progression.append(np.mean(all_modal_metrics[epoch][modality]['reconstruction']))
+                alignment_progression.append(np.mean(all_modal_metrics[epoch][modality]['alignment']))
+        
+        modal_analysis['modal_performance_progression'][modality] = {
+            'reconstruction_trend': reconstruction_progression,
+            'alignment_trend': alignment_progression,
+            'improvement_rate': (reconstruction_progression[0] - reconstruction_progression[-1]) / len(reconstruction_progression) if reconstruction_progression else 0.0
+        }
+    
+    return modal_analysis
 
-4. Training Convergence Pattern Analysis
-def analyze_training_convergence_patterns(model):
-    """Analyze training convergence and stability patterns"""
-    training_metrics = model.get_training_metrics()
+3. BAG-AWARE TRAINING WITH MODALITY CHARACTERISTICS PRESERVATION INTERPRETABILITY TEST
+Test Name: Bag_Characteristics_Preservation_Traceability_Analysis
+Feature Being Tested: Bag-Aware Training with Modality Characteristics Preservation - Your novel system that preserves complete bag modality characteristics (modality_mask, modality_weights, bag_id) alongside trained models, creating full traceability from bag generation through learner selection to final trained model
+Interpretability Questions:
+How do preserved bag characteristics correlate with model performance?
+What's the relationship between modality weights and training effectiveness?
+How does bag configuration influence final model quality?
+Which bag characteristics are most predictive of performance?
+How does the complete audit trail help understand ensemble behavior?
+What insights can be gained from the bag-to-model traceability?
+Analysis Functions:
+def analyze_bag_characteristics_preservation_traceability(model):
+    """Analyze traceability and insights from bag characteristics preservation"""
+    trained_learners = model.get_trained_learners()
     
-    convergence_metrics = training_metrics['convergence_metrics']
-    
-    return {
-        'loss_convergence': convergence_metrics['loss_convergence'],
-        'gradient_norms': convergence_metrics['gradient_norms'],
-        'learning_rate_schedule': convergence_metrics['learning_rate_schedule'],
-        'convergence_stability': convergence_metrics['stability_score'],
-        'early_stopping_behavior': convergence_metrics['early_stopping_analysis']
+    traceability_analysis = {
+        'bag_characteristics_performance_correlation': {},
+        'modality_weight_effectiveness': {},
+        'bag_configuration_impact': {},
+        'audit_trail_insights': {},
+        'performance_prediction_accuracy': {},
+        'ensemble_behavior_analysis': {}
     }
-Interpretability Questions:
-How stable is the training convergence?
-When does the model converge and why?
-How does the learning rate schedule affect convergence?
-What triggers early stopping decisions?
-
-5. Cross-Modal Learning Dynamics Analysis
-def analyze_cross_modal_learning_dynamics(model):
-    """Analyze how different modalities learn and interact"""
-    training_metrics = model.get_training_metrics()
     
-    cross_modal_metrics = training_metrics['cross_modal_metrics']
+    # Analyze bag characteristics vs performance
+    bag_performance_data = []
+    for learner_info in trained_learners:
+        bag_data = {
+            'bag_id': learner_info.bag_id,
+            'modality_mask': learner_info.modality_mask,
+            'modality_weights': learner_info.modality_weights,
+            'final_performance': learner_info.final_performance,
+            'learner_type': learner_info.learner_type
+        }
+        bag_performance_data.append(bag_data)
     
-    return {
-        'modality_learning_rates': cross_modal_metrics['modality_learning_rates'],
-        'cross_modal_interactions': cross_modal_metrics['interaction_matrix'],
-        'modality_contribution': cross_modal_metrics['contribution_analysis'],
-        'learning_synchronization': cross_modal_metrics['synchronization_score'],
-        'modality_competition': cross_modal_metrics['competition_analysis']
+    # Calculate correlations
+    modality_count_correlation = np.corrcoef(
+        [len([m for m, active in bag['modality_mask'].items() if active]) for bag in bag_performance_data],
+        [bag['final_performance'] for bag in bag_performance_data]
+    )[0, 1]
+    
+    modality_weight_correlation = {}
+    for modality in trained_learners[0].modality_weights.keys():
+        weights = [bag['modality_weights'].get(modality, 0.0) for bag in bag_performance_data]
+        performances = [bag['final_performance'] for bag in bag_performance_data]
+        modality_weight_correlation[modality] = np.corrcoef(weights, performances)[0, 1]
+    
+    traceability_analysis['bag_characteristics_performance_correlation'] = {
+        'modality_count_correlation': modality_count_correlation,
+        'modality_weight_correlations': modality_weight_correlation,
+        'learner_type_performance': {}
     }
-Interpretability Questions:
-Which modalities learn fastest/slowest?
-How do modalities interact during training?
-Is there competition or cooperation between modalities?
-How synchronized is learning across modalities?
-
-6. Resource Utilization Analysis
-def analyze_resource_utilization(model):
-    """Analyze computational resource usage during training"""
-    training_metrics = model.get_training_metrics()
     
-    resource_metrics = training_metrics['resource_metrics']
-    
-    return {
-        'memory_usage_patterns': resource_metrics['memory_usage'],
-        'computational_efficiency': resource_metrics['efficiency_metrics'],
-        'training_time_breakdown': resource_metrics['time_breakdown'],
-        'resource_bottlenecks': resource_metrics['bottleneck_analysis'],
-        'scalability_metrics': resource_metrics['scalability_analysis']
+    # Analyze audit trail completeness
+    audit_trail_completeness = {
+        'bag_id_preserved': all(hasattr(li, 'bag_id') and li.bag_id > 0 for li in trained_learners),
+        'modality_mask_preserved': all(hasattr(li, 'modality_mask') and len(li.modality_mask) > 0 for li in trained_learners),
+        'modality_weights_preserved': all(hasattr(li, 'modality_weights') and len(li.modality_weights) > 0 for li in trained_learners),
+        'training_metrics_preserved': all(hasattr(li, 'training_metrics') and len(li.training_metrics) > 0 for li in trained_learners)
     }
-Interpretability Questions:
-How efficiently are computational resources used?
-What are the main resource bottlenecks?
-How does resource usage scale with model size?
-Which training components are most expensive?
-
-7. Training Robustness Analysis
-def analyze_training_robustness(model):
-    """Analyze training robustness and stability"""
-    training_metrics = model.get_training_metrics()
     
-    robustness_metrics = training_metrics['robustness_metrics']
-    
-    return {
-        'gradient_stability': robustness_metrics['gradient_stability'],
-        'loss_landscape_analysis': robustness_metrics['loss_landscape'],
-        'training_noise_robustness': robustness_metrics['noise_robustness'],
-        'hyperparameter_sensitivity': robustness_metrics['hyperparameter_sensitivity'],
-        'generalization_gap': robustness_metrics['generalization_analysis']
+    traceability_analysis['audit_trail_insights'] = {
+        'completeness_score': sum(audit_trail_completeness.values()) / len(audit_trail_completeness),
+        'preservation_details': audit_trail_completeness,
+        'traceability_benefits': {
+            'bag_to_performance_traceable': True,
+            'modality_contribution_identifiable': True,
+            'training_progression_visible': True,
+            'ensemble_diversity_analyzable': True
+        }
     }
-Interpretability Questions:
-How robust is training to hyperparameter changes?
-What's the loss landscape like during training?
-How sensitive is training to noise and perturbations?
-What's the generalization gap between train and validation?
-
-8. Complete Stage 4 Interpretability Analysis
-def comprehensive_stage4_interpretability_study(model):
-    """Comprehensive interpretability analysis for Stage 4 only"""
     
-    results = {}
-    
-    # 1. Cross-modal denoising effectiveness analysis
-    results['cross_modal_denoising'] = analyze_cross_modal_denoising_effectiveness(model)
-    
-    # 2. Progressive learning behavior analysis
-    results['progressive_learning'] = analyze_progressive_learning_behavior(model)
-    
-    # 3. Multi-objective optimization analysis
-    results['multi_objective_optimization'] = analyze_multi_objective_optimization(model)
-    
-    # 4. Training convergence pattern analysis
-    results['convergence_patterns'] = analyze_training_convergence_patterns(model)
-    
-    # 5. Cross-modal learning dynamics analysis
-    results['cross_modal_dynamics'] = analyze_cross_modal_learning_dynamics(model)
-    
-    # 6. Resource utilization analysis
-    results['resource_utilization'] = analyze_resource_utilization(model)
-    
-    # 7. Training robustness analysis
-    results['training_robustness'] = analyze_training_robustness(model)
-    
-    return results
+    return traceability_analysis
 
 //robustness test
-1. Cross-Modal Denoising Robustness
-def test_cross_modal_denoising_robustness():
-    """Test robustness of cross-modal denoising system"""
-    denoising_robustness_tests = {
-        'denoising_strategies': ['adaptive', 'fixed', 'progressive'],
-        'denoising_weights': [0.1, 0.3, 0.5, 0.7, 0.9],
-        'denoising_objectives': ['reconstruction', 'alignment', 'consistency', 'information'],
-        'noise_levels': [0.0, 0.05, 0.1, 0.2, 0.3],
-        'modality_combinations': ['text+image', 'text+metadata', 'image+metadata', 'all_modalities']
-    }
-    Purpose: Test how well the cross-modal denoising system handles different configurations and noise levels
+1. CROSS-MODAL DENOISING SYSTEM ROBUSTNESS TEST
+Test Name: Cross_Modal_Denoising_Robustness
+Feature Being Tested: Advanced Cross-Modal Denoising Loss - Your novel comprehensive denoising system that reduces noise and improves consistency across modalities using multiple objectives (reconstruction, alignment, consistency)
+Purpose: Test how well the cross-modal denoising system handles different configurations, noise levels, and training scenarios
+Robustness Test Scenarios:
+denoising_robustness_tests = {
+    'denoising_strategies': ['adaptive', 'fixed', 'progressive'],
+    'denoising_weights': [0.05, 0.1, 0.2, 0.3, 0.5],
+    'denoising_objectives': [['reconstruction'], ['alignment'], ['consistency'], ['reconstruction', 'alignment'], ['reconstruction', 'alignment', 'consistency']],
+    'noise_levels': [0.0, 0.05, 0.1, 0.2, 0.3],
+    'modality_combinations': ['text_only', 'image_only', 'text+image', 'text+metadata', 'image+metadata', 'all_modalities'],
+    'training_epochs': [10, 25, 50, 100],
+    'batch_sizes': [16, 32, 64, 128]
+}
 Tests:
 Strategy Robustness: Test with adaptive, fixed, progressive denoising strategies
-Weight Sensitivity: Test with different denoising weight values (0.1 to 0.9)
-Objective Robustness: Test with different denoising objectives
+Weight Sensitivity: Test with different denoising weight values (0.05 to 0.5)
+Objective Robustness: Test with different denoising objective combinations
 Noise Robustness: Test with different noise levels in training data
 Modality Robustness: Test with different modality combinations
+Training Robustness: Test with different training configurations (epochs, batch sizes)
 
-2. Progressive Learning Robustness
-def test_progressive_learning_robustness():
-    """Test robustness of progressive learning system"""
-    progressive_robustness_tests = {
-        'complexity_schedules': ['linear', 'exponential', 'step', 'adaptive'],
-        'learning_rate_schedules': ['cosine_restarts', 'onecycle', 'plateau', 'step'],
-        'progression_speeds': ['slow', 'medium', 'fast', 'adaptive'],
-        'difficulty_levels': ['easy', 'medium', 'hard', 'mixed'],
-        'progression_triggers': ['epoch_based', 'loss_based', 'accuracy_based', 'adaptive']
-    }
-Purpose: Test how well progressive learning adapts to different training scenarios
+2. MODAL-SPECIFIC METRICS TRACKING ROBUSTNESS TEST
+Test Name: Modal_Specific_Metrics_Tracking_Robustness
+Feature Being Tested: Comprehensive Modal-Specific Training Metrics - Your novel granular performance tracking system that captures per-modality reconstruction losses, alignment scores, and consistency scores during training
+Purpose: Test how well the modal-specific metrics tracking system handles different tracking configurations, data variations, and computational constraints
+Robustness Test Scenarios:
+modal_tracking_robustness_tests = {
+    'tracking_frequencies': ['every_epoch', 'every_2_epochs', 'every_5_epochs', 'every_10_epochs'],
+    'tracking_combinations': [
+        {'track_modal_reconstruction': True, 'track_modal_alignment': False, 'track_modal_consistency': False},
+        {'track_modal_reconstruction': False, 'track_modal_alignment': True, 'track_modal_consistency': False},
+        {'track_modal_reconstruction': False, 'track_modal_alignment': False, 'track_modal_consistency': True},
+        {'track_modal_reconstruction': True, 'track_modal_alignment': True, 'track_modal_consistency': False},
+        {'track_modal_reconstruction': True, 'track_modal_alignment': True, 'track_modal_consistency': True}
+    ],
+    'modality_selections': ['all_modalities', 'primary_modalities_only', 'secondary_modalities_only', 'mixed_selection'],
+    'data_sizes': ['small', 'medium', 'large', 'very_large'],
+    'computational_constraints': ['low_memory', 'high_memory', 'cpu_only', 'gpu_available'],
+    'training_durations': ['short', 'medium', 'long', 'very_long']
+}
 Tests:
-Schedule Robustness: Test with different complexity and learning rate schedules
-Speed Robustness: Test with different progression speeds
-Difficulty Robustness: Test with different difficulty levels
-Trigger Robustness: Test with different progression triggers
-Adaptation Robustness: Test how well it adapts to training dynamics
+Frequency Robustness: Test with different tracking frequencies
+Combination Robustness: Test with different tracking metric combinations
+Modality Selection Robustness: Test with different modality selection strategies
+Data Size Robustness: Test with different dataset sizes
+Computational Robustness: Test under different computational constraints
+Duration Robustness: Test with different training durations
 
-3. Multi-Objective Optimization Robustness
-def test_multi_objective_optimization_robustness():
-    """Test robustness of multi-objective optimization"""
-    multi_objective_robustness_tests = {
-        'optimization_strategies': ['balanced', 'accuracy', 'speed', 'memory'],
-        'objective_weights': {
-            'accuracy': [0.2, 0.4, 0.6, 0.8],
-            'efficiency': [0.1, 0.3, 0.5, 0.7],
-            'robustness': [0.1, 0.3, 0.5, 0.7]
-        },
-        'tradeoff_scenarios': ['accuracy_heavy', 'efficiency_heavy', 'robustness_heavy', 'balanced'],
-        'optimization_methods': ['pareto', 'weighted_sum', 'epsilon_constraint', 'adaptive']
-    }
-Purpose: Test how well multi-objective optimization handles different objective configurations
+3. BAG CHARACTERISTICS PRESERVATION ROBUSTNESS TEST
+Test Name: Bag_Characteristics_Preservation_Robustness
+Feature Being Tested: Bag-Aware Training with Modality Characteristics Preservation - Your novel system that preserves complete bag modality characteristics (modality_mask, modality_weights, bag_id) alongside trained models, creating full traceability from bag generation through learner selection to final trained model
+Purpose: Test how well the bag characteristics preservation system handles different preservation configurations, memory constraints, and data variations
+Robustness Test Scenarios:
+bag_preservation_robustness_tests = {
+    'preservation_combinations': [
+        {'preserve_bag_characteristics': False, 'save_modality_mask': False, 'save_modality_weights': False, 'save_bag_id': False},
+        {'preserve_bag_characteristics': True, 'save_modality_mask': True, 'save_modality_weights': False, 'save_bag_id': False},
+        {'preserve_bag_characteristics': True, 'save_modality_mask': False, 'save_modality_weights': True, 'save_bag_id': False},
+        {'preserve_bag_characteristics': True, 'save_modality_mask': False, 'save_modality_weights': False, 'save_bag_id': True},
+        {'preserve_bag_characteristics': True, 'save_modality_mask': True, 'save_modality_weights': True, 'save_bag_id': True}
+    ],
+    'memory_constraints': ['low_memory', 'medium_memory', 'high_memory', 'unlimited_memory'],
+    'bag_sizes': ['small_ensemble', 'medium_ensemble', 'large_ensemble', 'very_large_ensemble'],
+    'modality_complexities': ['simple', 'moderate', 'complex', 'very_complex'],
+    'training_metrics_levels': ['minimal', 'standard', 'detailed', 'comprehensive'],
+    'learner_config_preservation': ['none', 'basic', 'detailed', 'complete']
+}
 Tests:
-Strategy Robustness: Test with different optimization strategies
-Weight Robustness: Test with different objective weight combinations
-Tradeoff Robustness: Test with different tradeoff scenarios
-Method Robustness: Test with different optimization methods
-Balance Robustness: Test how well it balances competing objectives
+Preservation Combination Robustness: Test with different preservation configuration combinations
+Memory Constraint Robustness: Test under different memory constraints
+Bag Size Robustness: Test with different ensemble sizes
+Modality Complexity Robustness: Test with different modality complexity levels
+Metrics Level Robustness: Test with different training metrics preservation levels
+Config Preservation Robustness: Test with different learner configuration preservation levels
 
-4. Training Convergence Robustness
-def test_training_convergence_robustness():
-    """Test robustness of training convergence patterns"""
-    convergence_robustness_tests = {
-        'optimizer_types': ['adamw', 'adam', 'sgd', 'rmsprop'],
-        'learning_rates': [0.001, 0.01, 0.1, 0.5],
-        'batch_sizes': [16, 32, 64, 128, 256],
-        'epoch_counts': [10, 50, 100, 200],
-        'early_stopping_patience': [5, 10, 20, 50]
-    }
-Purpose: Test how robust training convergence is to different hyperparameters
+4. INTEGRATED STAGE 4 ROBUSTNESS TEST
+Test Name: Integrated_Stage4_Novel_Features_Robustness
+Feature Being Tested: Combined Stage 4 Novel Features - Integration of cross-modal denoising, modal-specific metrics tracking, and bag characteristics preservation working together
+Purpose: Test how well all novel Stage 4 features work together under various combined stress conditions
+Robustness Test Scenarios:
+integrated_robustness_tests = {
+    'feature_combinations': [
+        {'enable_denoising': False, 'modal_specific_tracking': False, 'preserve_bag_characteristics': False},
+        {'enable_denoising': True, 'modal_specific_tracking': False, 'preserve_bag_characteristics': False},
+        {'enable_denoising': False, 'modal_specific_tracking': True, 'preserve_bag_characteristics': False},
+        {'enable_denoising': False, 'modal_specific_tracking': False, 'preserve_bag_characteristics': True},
+        {'enable_denoising': True, 'modal_specific_tracking': True, 'preserve_bag_characteristics': False},
+        {'enable_denoising': True, 'modal_specific_tracking': False, 'preserve_bag_characteristics': True},
+        {'enable_denoising': False, 'modal_specific_tracking': True, 'preserve_bag_characteristics': True},
+        {'enable_denoising': True, 'modal_specific_tracking': True, 'preserve_bag_characteristics': True}
+    ],
+    'stress_conditions': ['normal', 'high_noise', 'low_memory', 'fast_training', 'slow_training', 'mixed_stress'],
+    'dataset_variations': ['synthetic', 'real_world', 'imbalanced', 'high_dimensional', 'sparse', 'dense'],
+    'hardware_configurations': ['cpu_only', 'gpu_available', 'multi_gpu', 'distributed', 'edge_device']
+}
 Tests:
-Optimizer Robustness: Test with different optimizer types
-Learning Rate Robustness: Test with different learning rates
-Batch Size Robustness: Test with different batch sizes
-Epoch Robustness: Test with different epoch counts
-Early Stopping Robustness: Test with different patience values
-
-5. Cross-Modal Learning Dynamics Robustness
-def test_cross_modal_dynamics_robustness():
-    """Test robustness of cross-modal learning dynamics"""
-    cross_modal_robustness_tests = {
-        'modality_combinations': ['text_only', 'image_only', 'metadata_only', 'text+image', 'text+metadata', 'image+metadata', 'all'],
-        'modality_qualities': ['high', 'medium', 'low', 'mixed'],
-        'modality_imbalances': ['balanced', 'text_heavy', 'image_heavy', 'metadata_heavy'],
-        'cross_modal_interactions': ['strong', 'weak', 'none', 'adaptive'],
-        'modality_synchronization': ['synchronized', 'asynchronous', 'adaptive']
-    }
-Purpose: Test how well cross-modal learning handles different modality scenarios
-Tests:
-Combination Robustness: Test with different modality combinations
-Quality Robustness: Test with different modality qualities
-Balance Robustness: Test with different modality imbalances
-Interaction Robustness: Test with different cross-modal interaction strengths
-Synchronization Robustness: Test with different synchronization patterns
-
-6. Resource Utilization Robustness
-def test_resource_utilization_robustness():
-    """Test robustness of resource utilization"""
-    resource_robustness_tests = {
-        'memory_constraints': ['low', 'medium', 'high', 'unlimited'],
-        'compute_constraints': ['cpu_only', 'gpu_available', 'multi_gpu', 'distributed'],
-        'time_constraints': ['fast', 'medium', 'slow', 'unlimited'],
-        'batch_size_adaptations': ['fixed', 'adaptive', 'memory_based', 'time_based'],
-        'mixed_precision': ['fp32', 'fp16', 'bf16', 'adaptive']
-    }
-Purpose: Test how well the training pipeline adapts to different resource constraints
-Tests:
-Memory Robustness: Test with different memory constraints
-Compute Robustness: Test with different compute resources
-Time Robustness: Test with different time constraints
-Adaptation Robustness: Test with different adaptation strategies
-Precision Robustness: Test with different precision modes
-
-7. Training Stability Robustness
-def test_training_stability_robustness():
-    """Test robustness of training stability"""
-    stability_robustness_tests = {
-        'gradient_clipping': [0.5, 1.0, 2.0, 5.0, 'adaptive'],
-        'label_smoothing': [0.0, 0.1, 0.2, 0.3],
-        'weight_decay': [0.0, 0.01, 0.1, 0.5],
-        'dropout_rates': [0.0, 0.1, 0.3, 0.5],
-        'noise_injection': [0.0, 0.01, 0.05, 0.1]
-    }
-Purpose: Test how stable training is under different regularization conditions
-Tests:
-Gradient Robustness: Test with different gradient clipping values
-Regularization Robustness: Test with different regularization techniques
-Noise Robustness: Test with different noise injection levels
-Stability Robustness: Test training stability under various conditions
-Convergence Robustness: Test convergence under different stability settings
-
-8. Hyperparameter Robustness
-def test_hyperparameter_robustness():
-    """Test robustness to different hyperparameter configurations"""
-    hyperparameter_robustness_tests = {
-        'hyperparameter_ranges': {
-            'epochs': [5, 20, 50, 100],
-            'batch_size': [16, 32, 64, 128],
-            'learning_rate': [0.0001, 0.001, 0.01, 0.1],
-            'denoising_weight': [0.1, 0.3, 0.5, 0.7],
-            'early_stopping_patience': [5, 10, 20, 50]
-        },
-        'hyperparameter_combinations': ['conservative', 'aggressive', 'balanced', 'extreme'],
-        'hyperparameter_sensitivity': ['low', 'medium', 'high'],
-        'hyperparameter_interactions': ['independent', 'coupled', 'conflicting']
-    }
-Purpose: Test how robust training is to different hyperparameter configurations
-Tests:
-Range Robustness: Test with different hyperparameter value ranges
-Combination Robustness: Test with different hyperparameter combinations
-Sensitivity Robustness: Test sensitivity to hyperparameter changes
-Interaction Robustness: Test interactions between different hyperparameters
-Optimization Robustness: Test if hyperparameter tuning improves robustness
-
-9. Data Quality Robustness
-def test_data_quality_robustness():
-    """Test robustness to different data quality scenarios"""
-    data_quality_robustness_tests = {
-        'data_quality_levels': ['high', 'medium', 'low', 'mixed'],
-        'noise_levels': [0.0, 0.05, 0.1, 0.2, 0.3],
-        'missing_data_patterns': ['none', 'random', 'systematic', 'modality_specific'],
-        'data_distributions': ['normal', 'uniform', 'skewed', 'multimodal'],
-        'data_imbalances': ['balanced', 'slightly_imbalanced', 'highly_imbalanced']
-    }
-Purpose: Test how well training handles different data quality scenarios
-Tests:
-Quality Robustness: Test with different data quality levels
-Noise Robustness: Test with different noise levels
-Missing Data Robustness: Test with different missing data patterns
-Distribution Robustness: Test with different data distributions
-Balance Robustness: Test with different data imbalances
-
-10. Training Pipeline Integration Robustness
-def test_training_pipeline_integration_robustness():
-    """Test robustness of training pipeline integration"""
-    integration_robustness_tests = {
-        'pipeline_components': ['denoising_only', 'progressive_only', 'multi_objective_only', 'all_combined'],
-        'component_interactions': ['independent', 'coupled', 'conflicting', 'synergistic'],
-        'pipeline_orders': ['sequential', 'parallel', 'adaptive', 'mixed'],
-        'component_failures': ['graceful_degradation', 'fallback_modes', 'error_handling'],
-        'pipeline_scalability': ['small_scale', 'medium_scale', 'large_scale', 'distributed']
-    }
-Purpose: Test how well the training pipeline components work together
-Tests:
-Component Robustness: Test with different component combinations
-Interaction Robustness: Test with different component interactions
-Order Robustness: Test with different pipeline execution orders
-Failure Robustness: Test with different component failure scenarios
-Scalability Robustness: Test with different pipeline scales
-
-Complete Stage 4 Robustness Analysis
-def comprehensive_stage4_robustness_study():
-    """Comprehensive robustness analysis for Stage 4 only"""
-    
-    results = {}
-    
-    # 1. Cross-modal denoising robustness
-    results['cross_modal_denoising'] = test_cross_modal_denoising_robustness()
-    
-    # 2. Progressive learning robustness
-    results['progressive_learning'] = test_progressive_learning_robustness()
-    
-    # 3. Multi-objective optimization robustness
-    results['multi_objective_optimization'] = test_multi_objective_optimization_robustness()
-    
-    # 4. Training convergence robustness
-    results['training_convergence'] = test_training_convergence_robustness()
-    
-    # 5. Cross-modal learning dynamics robustness
-    results['cross_modal_dynamics'] = test_cross_modal_dynamics_robustness()
-    
-    # 6. Resource utilization robustness
-    results['resource_utilization'] = test_resource_utilization_robustness()
-    
-    # 7. Training stability robustness
-    results['training_stability'] = test_training_stability_robustness()
-    
-    # 8. Hyperparameter robustness
-    results['hyperparameter'] = test_hyperparameter_robustness()
-    
-    # 9. Data quality robustness
-    results['data_quality'] = test_data_quality_robustness()
-    
-    # 10. Training pipeline integration robustness
-    results['pipeline_integration'] = test_training_pipeline_integration_robustness()
-    
-    return results
+Feature Combination Robustness: Test with different combinations of novel features enabled/disabled
+Stress Condition Robustness: Test under various stress conditions
+Dataset Variation Robustness: Test with different dataset characteristics
+Hardware Robustness: Test under different hardware configurations
+Integration Robustness: Test how well features integrate with each other
+Performance Robustness: Test performance under combined feature usage
 
 stage 5:
 
 //summary
-Stage 5 serves as the sophisticated inference engine of the multimodal ensemble pipeline, responsible for aggregating predictions from all trained base learners and producing final ensemble decisions with uncertainty quantification. This stage takes the trained learners and their corresponding bag configurations from Stage 4 and orchestrates intelligent prediction fusion using advanced aggregation strategies.
-The core functionality of Stage 5 revolves around exact data reconstruction and intelligent aggregation. When new test data arrives, Stage 5 reconstructs the exact same data structure that each individual learner was trained on by applying the saved bag configurations from Stage 2. This includes applying the same modality masks (which modalities were active), feature masks (which specific features were selected), and data indices (which samples were used) that were used during training. This ensures that each learner receives data in the exact same format it was trained on, maintaining consistency and reliability.
-Once the data is reconstructed for each learner, Stage 5 collects predictions from all trained learners and applies sophisticated aggregation strategies to combine them into a final ensemble prediction. The system supports multiple aggregation approaches including simple majority voting, weighted voting based on learner performance, confidence-weighted aggregation, dynamic weighting that adapts to data characteristics, and the novel transformer-based meta-learning fusion that uses attention mechanisms to intelligently combine predictions. The transformer meta-learner is particularly innovative as it learns to weight different learners' predictions based on their relevance and confidence for each specific input.
-In addition to prediction aggregation, Stage 5 provides comprehensive uncertainty quantification through multiple methods including entropy estimation, variance-based uncertainty, Monte Carlo sampling, ensemble disagreement analysis, and attention-based uncertainty estimation. This uncertainty information is crucial for understanding prediction reliability and making informed decisions. The system also includes confidence calibration mechanisms to ensure that the confidence scores accurately reflect the true prediction reliability, and provides modality importance analysis to understand which modalities contributed most to each prediction decision.
-The final output of Stage 5 is a comprehensive PredictionResult object that contains not just the final predictions, but also confidence scores, uncertainty estimates, modality importance weights, and detailed metadata about the prediction process. This makes Stage 5 a production-ready inference system that can handle both classification and regression tasks, supports GPU acceleration for real-time inference, and provides the interpretability and reliability metrics necessary for deployment in critical applications.
+Stage 5: Simplified Multimodal Ensemble Prediction System orchestrates the final prediction phase through a streamlined pipeline that transforms trained weak learners into intelligent ensemble predictions. Step 1 (Individual Predictions) employs _get_individual_predictions() to obtain predictions from each trained learner, handling both PyTorch neural networks and sklearn models through forward passes and probability calculations with robust fallback mechanisms. Step 2 (Confidence & Uncertainty Computation) applies _compute_confidence() and _compute_uncertainty() using entropy, variance, or confidence-based methods to estimate prediction reliability and confidence scores. Step 3 (Modality-Aware Transformer Aggregation) - the novel core feature - utilizes _transformer_fusion() to implement adaptive ensemble aggregation through a modality-aware transformer meta-learner that dynamically estimates relative importance of each learner's predictions, evaluates accuracy AND generalization ability across diverse subsets, and applies context-dependent attention weights that mirror adaptive dropout philosophy. The transformer meta-learner combines standard transformer attention with a novel signal integration scheme: generalization scores, confidence bonuses, uncertainty penalties, and modality importance weights to produce intelligent ensemble predictions specifically designed for multimodal learning scenarios. Step 4 (Result Assembly) orchestrates all previous steps through the main predict() function, combining predictions, confidence, uncertainty, modality importance, and metadata into a final PredictionResult object. The flow progresses linearly: test data → individual predictions → confidence/uncertainty computation → simplified transformer aggregation → final result assembly, delivering actual predictions with uncertainty quantification, confidence scores, and modality importance analysis through the novel simplified transformer meta-learner for adaptive ensemble aggregation.
 
 //novel features
-1. Exact Bag Data Reconstruction
-Novel Innovation: This is a groundbreaking feature that ensures perfect consistency between training and inference. Unlike traditional ensemble methods that use the same data for all learners, Stage 5 reconstructs the exact same data structure that each individual learner was trained on during Stage 2. This includes:
-Modality Mask Reconstruction: Reapplies which modalities were active/dropped for each learner
-Feature Mask Reconstruction: Reapplies which specific features were selected for each modality
-Data Index Reconstruction: Uses the exact same sample indices that were used during training
-Bootstrap Sample Reconstruction: Recreates the exact bootstrap samples used during training
-2. Transformer-Based Meta-Learner for Aggregation
-Novel Innovation: The TransformerMetaLearner is a state-of-the-art neural meta-learner that uses attention mechanisms to intelligently combine predictions from different learners. This is novel because:
-Attention-Based Fusion: Uses multi-head attention to learn which learners are most relevant for each specific input
-Dynamic Weighting: Learns to weight different learners' predictions based on their relevance and confidence
-Context-Aware Aggregation: The transformer architecture allows the system to consider the context of all predictions when making the final decision
-Interpretable Attention: Provides attention weights that can be used for interpretability analysis
-3. Attention-Based Uncertainty Estimation
-Novel Innovation: The ATTENTION_BASED uncertainty method uses the attention weights from the transformer meta-learner to estimate prediction uncertainty. This is novel because:
-Learner Disagreement Analysis: Uses attention weights to identify when learners disagree on predictions
-Contextual Uncertainty: Considers the context of all predictions when estimating uncertainty
-Attention Weight Variance: Uses the variance in attention weights as a measure of uncertainty
-4. Dynamic Weighting Aggregation Strategy
-Novel Innovation: The DYNAMIC_WEIGHTING strategy adapts learner weights based on current performance and data characteristics. This is novel because:
-Adaptive Weight Computation: Dynamically adjusts weights based on real-time performance
-Data-Dependent Weighting: Weights change based on the characteristics of the current input data
-Performance-Aware Aggregation: Considers both historical performance and current confidence
-5. Uncertainty-Weighted Aggregation Strategy
-Novel Innovation: The UNCERTAINTY_WEIGHTED strategy uses prediction uncertainty to weight different learners' contributions. This is novel because:
-Uncertainty-Aware Fusion: Learners with lower uncertainty get higher weights
-Confidence-Based Weighting: Combines both performance and uncertainty in the weighting scheme
-Robust Aggregation: Reduces the influence of uncertain predictions on the final decision
-6. Comprehensive Modality Importance Analysis
-Novel Innovation: The system provides detailed analysis of which modalities contributed most to each prediction. This is novel because:
-Per-Prediction Modality Analysis: Analyzes modality importance for each individual prediction
-Attention-Based Importance: Uses attention weights to determine modality importance
-Cross-Modal Contribution Tracking: Tracks how different modalities interact and contribute to predictions
-7. Multi-Method Uncertainty Quantification
-Novel Innovation: The system provides multiple uncertainty estimation methods that can be combined or used independently:
-Entropy-Based Uncertainty: Uses prediction entropy to estimate uncertainty
-Variance-Based Uncertainty: Uses prediction variance across learners
-Monte Carlo Uncertainty: Uses Monte Carlo sampling for uncertainty estimation
-Ensemble Disagreement: Uses disagreement between learners as uncertainty measure
-Attention-Based Uncertainty: Uses attention weights for uncertainty estimation
-8. Deterministic Learner Ordering
-Novel Innovation: The system ensures deterministic ordering of learners and their predictions, which is crucial for reproducibility and consistency. This is novel because:
-Consistent Prediction Ordering: Ensures the same order of learners across different runs
-Reproducible Results: Guarantees identical results across different executions
-Stable Aggregation: Prevents random variations in ensemble predictions
-9. Multi-Model Support with Fallback Mechanisms
-Novel Innovation: The system supports multiple types of learners (PyTorch, scikit-learn, custom interfaces) with intelligent fallback mechanisms. This is novel because:
-Universal Learner Support: Can handle any type of trained learner
-Intelligent Fallback: Automatically falls back to alternative prediction methods if the primary method fails
-Seamless Integration: Provides a unified interface for different learner types
-10. Production-Grade Prediction Result Container
-Novel Innovation: The PredictionResult dataclass provides a comprehensive container for all prediction-related information. This is novel because:
-Structured Prediction Output: Organizes predictions, confidence, uncertainty, and metadata in a structured format
-Comprehensive Metadata: Includes detailed information about the prediction process
-Interpretability Support: Provides all necessary information for interpretability analysis
+NOVEL FEATURE 1: MODALITY-AWARE TRANSFORMER ENSEMBLE AGGREGATION
+The novel modality-aware transformer ensemble aggregation implements adaptive ensemble weighting specifically designed for multimodal learning scenarios through a streamlined but effective approach. The TransformerMetaLearner class operates through five key steps: (1) Input Projection where learner outputs are mapped to a hidden dimension through a linear layer, (2) Generalization Scoring where a neural network computes generalization scores for each learner based on their ability to perform across diverse subsets, (3) Transformer Encoding where a standard transformer encoder processes the projected outputs to create contextualized learner representations that capture relationships between learners, (4) Attention Computation where an attention head computes base attention weights from the contextualized embeddings, and (5) Adaptive Signal Integration where the final mixture weights combine base transformer attention with a novel weighting scheme: generalization scores (weighted by 2.0), confidence bonuses (weighted by 1.5), uncertainty penalties (weighted by 1.0), and modality importance weights (weighted by 0.5) to produce intelligent ensemble predictions. The novelty lies in the specific application of transformer attention to multimodal ensemble aggregation with modality-aware signal integration, ensuring that learners with higher generalization ability, confidence, and modality importance receive greater weight in the final ensemble decision, while overfit learners and those with high uncertainty are appropriately down-weighted.
+
+NOVEL FEATURE 2: ROBUST PREDICTION HANDLING WITH FALLBACK MECHANISMS
+The novel robust prediction handling system ensures reliable ensemble predictions even when individual learners fail through comprehensive fallback mechanisms in the _get_individual_predictions() function. The system attempts multiple prediction methods for each learner: first trying predict_proba() for classification tasks, then falling back to predict() for general predictions, then attempting forward() for PyTorch models, and finally creating dummy predictions as a last resort. This robust approach handles diverse learner types (sklearn models, PyTorch neural networks, custom learners) and gracefully manages prediction failures by providing sensible defaults, ensuring that the ensemble can continue operating even when some learners encounter issues. The system also includes comprehensive error handling with warnings for failed predictions while maintaining ensemble functionality, making the overall system more reliable and production-ready.
 
 //hyperparameters
-🎯 CORE AGGREGATION HYPERPARAMETERS
 1. aggregation_strategy
-Description: Ensemble aggregation strategy for combining predictions from multiple learners - includes your novel transformer-based meta-learning fusion
-Range: ['majority_vote', 'weighted_vote', 'confidence_weighted', 'stacking', 'dynamic_weighting', 'uncertainty_weighted', 'transformer_fusion']
-Default: 'transformer_fusion' (your novel feature)
-Testing: VARY - Test all 3 novel strategies: transformer_fusion, dynamic_weighting, uncertainty_weighted
+Description: Ensemble aggregation strategy for combining predictions from multiple learners - includes modality-aware transformer-based fusion
+Range: ['simple_average', 'weighted_average', 'transformer_fusion']
+Default: 'transformer_fusion' (moderately novel feature)
+Testing: VARY - Test all strategies, focus on transformer_fusion
 2. uncertainty_method
-Description: Method for quantifying prediction uncertainty - includes your novel attention-based uncertainty estimation
-Range: ['entropy', 'variance', 'monte_carlo', 'ensemble_disagreement', 'attention_based']
+Description: Method for quantifying prediction uncertainty - includes entropy, variance, and confidence-based estimation
+Range: ['entropy', 'variance', 'confidence']
 Default: 'entropy'
 Testing: VARY - Key parameter for uncertainty quantification
-3. calibrate_uncertainty
-Description: Whether to calibrate uncertainty estimates to ensure they accurately reflect true prediction reliability
-Range: [True, False]
-Default: True
-Testing: VARY - Affects prediction confidence quality
-4. device
-Description: Computing device for ensemble prediction - affects GPU acceleration and inference speed
-Range: ['auto', 'cpu', 'cuda']
-Default: 'auto'
-Testing: VARY - Affects computational performance
-🧠 TRANSFORMER META-LEARNER HYPERPARAMETERS
-5. transformer_num_heads
-Description: Number of attention heads in the transformer meta-learner - affects the model's ability to attend to different aspects of predictions
-Range: [4, 8, 12, 16]
-Default: 8
-Testing: FIXED - Keep 8 for optimal performance
-6. transformer_num_layers
+🧠 SIMPLIFIED TRANSFORMER META-LEARNER HYPERPARAMETERS
+3. transformer_num_heads
+Description: Number of attention heads in the simplified transformer meta-learner - affects the model's ability to attend to different aspects of predictions
+Range: [2, 4, 6, 8]
+Default: 4
+Testing: FIXED - Keep 4 for optimal performance
+4. transformer_num_layers
 Description: Number of transformer encoder layers in the meta-learner - affects model complexity and learning capacity
 Range: [1, 2, 3, 4]
 Default: 2
 Testing: FIXED - Keep 2 for efficiency
-7. transformer_hidden_dim
+5. transformer_hidden_dim
 Description: Hidden dimension size in the transformer meta-learner - affects model capacity and computational cost
-Range: [128, 256, 512, 1024]
-Default: 256
-Testing: FIXED - Keep 256 for balanced performance
+Range: [32, 64, 128, 256]
+Default: 64
+Testing: FIXED - Keep 64 for balanced performance
 🔧 PREDICTION CONFIGURATION HYPERPARAMETERS
-8. return_uncertainty
-Description: Whether to compute and return uncertainty estimates with predictions - affects computational cost and output richness
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for comprehensive predictions
-9. return_confidence
-Description: Whether to compute and return confidence scores with predictions - affects prediction interpretability
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for prediction reliability
-10. return_modality_importance
-Description: Whether to compute and return modality importance analysis - affects interpretability and computational cost
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for interpretability
-⚡ PERFORMANCE OPTIMIZATION HYPERPARAMETERS
-11. batch_prediction
-Description: Whether to process predictions in batches for memory efficiency - affects memory usage and speed
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for efficiency
-12. deterministic_ordering
-Description: Whether to use deterministic ordering of learners for reproducible results - affects result consistency
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for reproducibility
-13. fallback_mechanisms
-Description: Whether to enable fallback mechanisms for different learner types - affects robustness and compatibility
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for robustness
-🎯 TASK-SPECIFIC HYPERPARAMETERS
-14. task_type
+6. task_type
 Description: Type of prediction task - affects aggregation strategy and output format
-Range: ['auto', 'classification', 'regression']
-Default: 'auto'
-Testing: FIXED - Keep 'auto' for automatic detection
-15. multilabel_threshold
-Description: Threshold for multilabel classification predictions - affects binary classification decisions
-Range: [0.3, 0.4, 0.5, 0.6, 0.7]
-Default: 0.5
-Testing: FIXED - Keep 0.5 for standard threshold
-🔍 INTERPRETABILITY HYPERPARAMETERS
-16. compute_attention_weights
-Description: Whether to compute and return attention weights from transformer meta-learner - affects interpretability and computational cost
-Range: [True, False]
-Default: True
-Testing: FIXED - Keep True for interpretability
-17. modality_importance_method
-Description: Method for computing modality importance - affects interpretability analysis quality
-Range: ['attention_based', 'performance_based', 'uniform']
-Default: 'attention_based'
-Testing: FIXED - Keep 'attention_based' for novel feature
-18. uncertainty_aggregation
-Description: Method for aggregating uncertainty across learners - affects uncertainty estimation quality
-Range: ['mean', 'max', 'weighted_mean']
-Default: 'weighted_mean'
-Testing: FIXED - Keep 'weighted_mean' for optimal aggregation
+Range: ['classification', 'regression']
+Default: 'classification'
+Testing: FIXED - Keep 'classification' for standard tasks
 
-//abalation studies
-1. TRANSFORMER FUSION ABLATION STUDY
-Study Name: Transformer_Fusion_Aggregation_Ablation
-Feature Being Tested:
-Transformer-Based Meta-Learner Fusion - Your novel transformer-based meta-learner that uses attention mechanisms to intelligently combine predictions from different learners, rather than using simple voting or static weighting methods
-Control (Baseline):
-Traditional Weighted Voting: aggregation_strategy='weighted_vote' - Standard performance-based weighted voting that uses training metrics to weight learner predictions
+//ablation studies
+1. MODALITY-AWARE TRANSFORMER AGGREGATION ABLATION STUDY
+Study Name: Aggregation_Strategy_Ablation
+Feature Being Tested: Modality-Aware Transformer Ensemble Aggregation - The moderately novel transformer meta-learner that dynamically estimates relative importance of each learner's predictions through modality-aware adaptive weighting
+Control (Baseline): Simple Averaging - Basic ensemble prediction using simple averaging of all learner predictions without any adaptive weighting
 Variables for the Study:
 ablation_variables = [
     # Control group (baseline)
-    {'name': 'Weighted_Vote_Baseline', 'aggregation_strategy': 'weighted_vote'},
-    {'name': 'Majority_Vote_Baseline', 'aggregation_strategy': 'majority_vote'},
+    {'name': 'Simple_Average', 'aggregation_strategy': 'simple_average'},
+    {'name': 'Weighted_Average', 'aggregation_strategy': 'weighted_average'},
     
-    # Treatment group (your novel feature)
-    {'name': 'Transformer_Fusion_Default', 'aggregation_strategy': 'transformer_fusion', 'transformer_num_heads': 8, 'transformer_num_layers': 2},
-    {'name': 'Transformer_Fusion_4_Heads', 'aggregation_strategy': 'transformer_fusion', 'transformer_num_heads': 4, 'transformer_num_layers': 2},
-    {'name': 'Transformer_Fusion_12_Heads', 'aggregation_strategy': 'transformer_fusion', 'transformer_num_heads': 12, 'transformer_num_layers': 2},
-    {'name': 'Transformer_Fusion_1_Layer', 'aggregation_strategy': 'transformer_fusion', 'transformer_num_heads': 8, 'transformer_num_layers': 1},
-    {'name': 'Transformer_Fusion_3_Layers', 'aggregation_strategy': 'transformer_fusion', 'transformer_num_heads': 8, 'transformer_num_layers': 3},
-    
-    # Additional transformer variants
-    {'name': 'Transformer_Fusion_No_Attention', 'aggregation_strategy': 'transformer_fusion', 'compute_attention_weights': False},
-    {'name': 'Transformer_Fusion_With_Attention', 'aggregation_strategy': 'transformer_fusion', 'compute_attention_weights': True},
+    # Treatment group (novel feature)
+    {'name': 'Transformer_Fusion', 'aggregation_strategy': 'transformer_fusion'},
 ]
 
-2. DYNAMIC WEIGHTING ABLATION STUDY
-Study Name: Dynamic_Weighting_Aggregation_Ablation
-Feature Being Tested:
-Adaptive Dynamic Weighting - Your novel dynamic weighting strategy that adapts learner weights based on current performance and data characteristics in real-time, rather than using static performance-based weights
-Control (Baseline):
-Static Weighted Voting: aggregation_strategy='weighted_vote' - Traditional static weighting based on training performance metrics
-Variables for the Study:
-ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Static_Weighted_Vote', 'aggregation_strategy': 'weighted_vote'},
-    {'name': 'Confidence_Weighted_Vote', 'aggregation_strategy': 'confidence_weighted'},
-    
-    # Treatment group (your novel feature)
-    {'name': 'Dynamic_Weighting_Default', 'aggregation_strategy': 'dynamic_weighting'},
-    {'name': 'Dynamic_Weighting_Fast_Adaptation', 'aggregation_strategy': 'dynamic_weighting', 'adaptation_rate': 0.1},
-    {'name': 'Dynamic_Weighting_Slow_Adaptation', 'aggregation_strategy': 'dynamic_weighting', 'adaptation_rate': 0.01},
-    {'name': 'Dynamic_Weighting_High_Threshold', 'aggregation_strategy': 'dynamic_weighting', 'adaptation_threshold': 0.8},
-    {'name': 'Dynamic_Weighting_Low_Threshold', 'aggregation_strategy': 'dynamic_weighting', 'adaptation_threshold': 0.3},
-    
-    # Additional dynamic weighting variants
-    {'name': 'Dynamic_Weighting_Performance_Based', 'aggregation_strategy': 'dynamic_weighting', 'weighting_method': 'performance'},
-    {'name': 'Dynamic_Weighting_Confidence_Based', 'aggregation_strategy': 'dynamic_weighting', 'weighting_method': 'confidence'},
-    {'name': 'Dynamic_Weighting_Hybrid', 'aggregation_strategy': 'dynamic_weighting', 'weighting_method': 'hybrid'},
-]
-
-3. UNCERTAINTY-WEIGHTED AGGREGATION ABLATION STUDY
-Study Name: Uncertainty_Weighted_Aggregation_Ablation
-Feature Being Tested:
-Uncertainty-Aware Weighting - Your novel uncertainty-weighted aggregation that uses prediction uncertainty to weight different learners' contributions, giving higher weights to more certain predictions
-Control (Baseline):
-Confidence-Weighted Voting: aggregation_strategy='confidence_weighted' - Traditional confidence-based weighting that uses prediction confidence scores
-Variables for the Study:
-ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Confidence_Weighted_Baseline', 'aggregation_strategy': 'confidence_weighted'},
-    {'name': 'Weighted_Vote_Baseline', 'aggregation_strategy': 'weighted_vote'},
-    
-    # Treatment group (your novel feature)
-    {'name': 'Uncertainty_Weighted_Entropy', 'aggregation_strategy': 'uncertainty_weighted', 'uncertainty_method': 'entropy'},
-    {'name': 'Uncertainty_Weighted_Variance', 'aggregation_strategy': 'uncertainty_weighted', 'uncertainty_method': 'variance'},
-    {'name': 'Uncertainty_Weighted_Ensemble_Disagreement', 'aggregation_strategy': 'uncertainty_weighted', 'uncertainty_method': 'ensemble_disagreement'},
-    {'name': 'Uncertainty_Weighted_Attention_Based', 'aggregation_strategy': 'uncertainty_weighted', 'uncertainty_method': 'attention_based'},
-    
-    # Additional uncertainty weighting variants
-    {'name': 'Uncertainty_Weighted_High_Threshold', 'aggregation_strategy': 'uncertainty_weighted', 'uncertainty_threshold': 0.8},
-    {'name': 'Uncertainty_Weighted_Low_Threshold', 'aggregation_strategy': 'uncertainty_weighted', 'uncertainty_threshold': 0.3},
-    {'name': 'Uncertainty_Weighted_Calibrated', 'aggregation_strategy': 'uncertainty_weighted', 'calibrate_uncertainty': True},
-    {'name': 'Uncertainty_Weighted_Uncalibrated', 'aggregation_strategy': 'uncertainty_weighted', 'calibrate_uncertainty': False},
-]
-
-4. ATTENTION-BASED UNCERTAINTY ESTIMATION ABLATION STUDY
-Study Name: Attention_Based_Uncertainty_Estimation_Ablation
-Feature Being Tested:
-Attention-Based Uncertainty Quantification - Your novel attention-based uncertainty method that uses attention weights from the transformer meta-learner to estimate prediction uncertainty and identify learner disagreement
-Control (Baseline):
-Entropy-Based Uncertainty: uncertainty_method='entropy' - Traditional entropy-based uncertainty estimation using prediction probability distributions
-Variables for the Study:
-ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Entropy_Uncertainty_Baseline', 'uncertainty_method': 'entropy'},
-    {'name': 'Variance_Uncertainty_Baseline', 'uncertainty_method': 'variance'},
-    {'name': 'Ensemble_Disagreement_Baseline', 'uncertainty_method': 'ensemble_disagreement'},
-    
-    # Treatment group (your novel feature)
-    {'name': 'Attention_Based_Uncertainty_Default', 'uncertainty_method': 'attention_based', 'aggregation_strategy': 'transformer_fusion'},
-    {'name': 'Attention_Based_Uncertainty_4_Heads', 'uncertainty_method': 'attention_based', 'aggregation_strategy': 'transformer_fusion', 'transformer_num_heads': 4},
-    {'name': 'Attention_Based_Uncertainty_12_Heads', 'uncertainty_method': 'attention_based', 'aggregation_strategy': 'transformer_fusion', 'transformer_num_heads': 12},
-    
-    # Additional attention-based uncertainty variants
-    {'name': 'Attention_Based_Uncertainty_Calibrated', 'uncertainty_method': 'attention_based', 'calibrate_uncertainty': True},
-    {'name': 'Attention_Based_Uncertainty_Uncalibrated', 'uncertainty_method': 'attention_based', 'calibrate_uncertainty': False},
-    {'name': 'Attention_Based_Uncertainty_High_Threshold', 'uncertainty_method': 'attention_based', 'attention_threshold': 0.8},
-    {'name': 'Attention_Based_Uncertainty_Low_Threshold', 'uncertainty_method': 'attention_based', 'attention_threshold': 0.3},
-]
-
-5. COMPREHENSIVE NOVEL AGGREGATION STRATEGIES ABLATION STUDY
-Study Name: Comprehensive_Novel_Aggregation_Strategies_Ablation
-Feature Being Tested:
-All Novel Aggregation Strategies Combined - Testing the additive effects and interactions between all your novel Stage 5 aggregation strategies: Transformer Fusion, Dynamic Weighting, and Uncertainty-Weighted Aggregation
-Control (Baseline):
-Traditional Aggregation: aggregation_strategy='weighted_vote', uncertainty_method='entropy', calibrate_uncertainty=False - Traditional ensemble aggregation without any novel features
-Variables for the Study:
-ablation_variables = [
-    # Control group (baseline)
-    {'name': 'Baseline_Traditional_Aggregation', 'aggregation_strategy': 'weighted_vote', 'uncertainty_method': 'entropy', 'calibrate_uncertainty': False},
-    {'name': 'Baseline_Majority_Vote', 'aggregation_strategy': 'majority_vote', 'uncertainty_method': 'entropy', 'calibrate_uncertainty': False},
-    
-    # Individual novel features
-    {'name': 'Transformer_Fusion_Only', 'aggregation_strategy': 'transformer_fusion', 'uncertainty_method': 'entropy', 'calibrate_uncertainty': False},
-    {'name': 'Dynamic_Weighting_Only', 'aggregation_strategy': 'dynamic_weighting', 'uncertainty_method': 'entropy', 'calibrate_uncertainty': False},
-    {'name': 'Uncertainty_Weighted_Only', 'aggregation_strategy': 'uncertainty_weighted', 'uncertainty_method': 'entropy', 'calibrate_uncertainty': False},
-    {'name': 'Attention_Based_Uncertainty_Only', 'aggregation_strategy': 'weighted_vote', 'uncertainty_method': 'attention_based', 'calibrate_uncertainty': False},
-    
-    # Pairwise combinations
-    {'name': 'Transformer_Plus_Dynamic', 'aggregation_strategy': 'transformer_fusion', 'uncertainty_method': 'entropy', 'calibrate_uncertainty': False, 'dynamic_weighting': True},
-    {'name': 'Transformer_Plus_Uncertainty', 'aggregation_strategy': 'transformer_fusion', 'uncertainty_method': 'attention_based', 'calibrate_uncertainty': True},
-    {'name': 'Dynamic_Plus_Uncertainty', 'aggregation_strategy': 'uncertainty_weighted', 'uncertainty_method': 'entropy', 'calibrate_uncertainty': True},
-    
-    # All novel features combined
-    {'name': 'All_Novel_Aggregation_Features', 'aggregation_strategy': 'transformer_fusion', 'uncertainty_method': 'attention_based', 'calibrate_uncertainty': True, 'dynamic_weighting': True},
-]
-
-6. DEVICE AND PERFORMANCE OPTIMIZATION ABLATION STUDY
-Study Name: Device_Performance_Optimization_Ablation
-Feature Being Tested:
-Computational Performance Optimization - Testing the impact of different computing devices and optimization settings on your novel aggregation strategies
-Control (Baseline):
-CPU Processing: device='cpu' - Traditional CPU-based processing without GPU acceleration
-Variables for the Study:
-ablation_variables = [
-    # Control group (baseline)
-    {'name': 'CPU_Processing', 'device': 'cpu'},
-    {'name': 'Auto_Device_Selection', 'device': 'auto'},
-    
-    # Treatment group (performance optimization)
-    {'name': 'GPU_Processing', 'device': 'cuda'},
-    {'name': 'GPU_With_Batch_Processing', 'device': 'cuda', 'batch_prediction': True},
-    {'name': 'GPU_With_Optimized_Transformer', 'device': 'cuda', 'transformer_num_heads': 8, 'transformer_num_layers': 2},
-    
-    # Additional performance variants
-    {'name': 'CPU_With_Batch_Processing', 'device': 'cpu', 'batch_prediction': True},
-    {'name': 'GPU_With_Deterministic_Ordering', 'device': 'cuda', 'deterministic_ordering': True},
-    {'name': 'GPU_With_Fallback_Mechanisms', 'device': 'cuda', 'fallback_mechanisms': True},
-]
-
-//intepretability tests
-1. Transformer Fusion Attention Analysis
-def analyze_transformer_fusion_attention(model):
-    """Analyze attention patterns in transformer-based meta-learner"""
-    prediction_result = model.predict(test_data, return_uncertainty=True)
-    
-    # Get attention weights from transformer meta-learner
-    if hasattr(model.ensemble_, 'transformer_meta_learner'):
-        attention_weights = model.ensemble_.transformer_meta_learner.get_attention_weights()
-        
-        return {
-            'attention_patterns': attention_weights,
-            'learner_importance': attention_weights.mean(axis=0),
-            'attention_entropy': calculate_attention_entropy(attention_weights),
-            'attention_consistency': calculate_attention_consistency(attention_weights),
-            'cross_learner_attention': analyze_cross_learner_attention(attention_weights)
-        }
-    
-    return {'error': 'Transformer meta-learner not available'}
+//interpretability tests
+1. MODALITY-AWARE ENSEMBLE INTERPRETABILITY TEST
+Test Name: Modality_Aware_Ensemble_Interpretability
+Feature Being Tested: Modality-Aware Transformer Ensemble Aggregation - The moderately novel transformer meta-learner that provides interpretable insights into ensemble decision-making through attention weights, modality importance, and uncertainty quantification
 Interpretability Questions:
-Which learners receive the most attention in the transformer fusion?
-How consistent are attention patterns across different inputs?
-Do attention patterns change based on prediction confidence?
-How does attention distribution affect ensemble performance?
-
-2. Dynamic Weighting Behavior Analysis
-def analyze_dynamic_weighting_behavior(model):
-    """Analyze how dynamic weighting adapts to different inputs"""
-    prediction_results = []
-    
-    # Test on different types of inputs
-    for input_type in ['easy_samples', 'hard_samples', 'edge_cases']:
-        result = model.predict(input_data[input_type], return_uncertainty=True)
-        prediction_results.append({
-            'input_type': input_type,
-            'learner_weights': result.metadata.get('dynamic_weights', {}),
-            'weight_adaptation': result.metadata.get('weight_adaptation_history', {}),
-            'adaptation_speed': result.metadata.get('adaptation_speed', 0)
-        })
+How does the modality-aware transformer meta-learner weight different learners based on their performance characteristics?
+Which modalities contribute most to ensemble decisions and how is this reflected in attention weights?
+How does uncertainty quantification correlate with prediction accuracy and confidence?
+What is the relationship between generalization scores and final ensemble predictions?
+How effective is the novel signal integration scheme (generalization + confidence + uncertainty + modality importance)?
+Analysis Functions:
+def analyze_modality_aware_ensemble_interpretability(model):
+    """Analyze modality-aware ensemble interpretability"""
+    # Test different aggregation strategies
+    simple_result = model.predict(test_data, aggregation_strategy='simple_average')
+    weighted_result = model.predict(test_data, aggregation_strategy='weighted_average')
+    transformer_result = model.predict(test_data, aggregation_strategy='transformer_fusion')
     
     return {
-        'weight_adaptation_patterns': prediction_results,
-        'adaptation_consistency': analyze_weight_consistency(prediction_results),
-        'input_sensitivity': analyze_input_sensitivity(prediction_results),
-        'adaptation_effectiveness': calculate_adaptation_effectiveness(prediction_results)
+        'aggregation_strategy_comparison': compare_aggregation_strategies(simple_result, weighted_result, transformer_result),
+        'modality_importance_analysis': analyze_modality_importance(transformer_result),
+        'attention_weight_analysis': analyze_attention_weights(transformer_result),
+        'uncertainty_correlation_analysis': analyze_uncertainty_correlation(transformer_result),
+        'generalization_score_analysis': analyze_generalization_scores(transformer_result)
     }
-Interpretability Questions:
-How do learner weights adapt to different input characteristics?
-Which inputs trigger the most weight adaptation?
-How quickly does the system adapt to new input patterns?
-Does dynamic weighting improve prediction accuracy?
-
-3. Uncertainty-Weighted Aggregation Analysis
-def analyze_uncertainty_weighted_aggregation(model):
-    """Analyze how uncertainty affects learner weighting"""
-    prediction_result = model.predict(test_data, return_uncertainty=True)
-    
-    return {
-        'uncertainty_distribution': prediction_result.uncertainty,
-        'confidence_distribution': prediction_result.confidence,
-        'uncertainty_weight_mapping': analyze_uncertainty_weight_relationship(prediction_result),
-        'learner_uncertainty_scores': calculate_learner_uncertainty_scores(prediction_result),
-        'uncertainty_calibration': analyze_uncertainty_calibration(prediction_result),
-        'uncertainty_consistency': analyze_uncertainty_consistency(prediction_result)
-    }
-Interpretability Questions:
-How does prediction uncertainty correlate with learner weights?
-Which learners produce the most/least uncertain predictions?
-How well-calibrated are the uncertainty estimates?
-Does uncertainty-weighted aggregation improve ensemble reliability?
-
-4. Attention-Based Uncertainty Estimation Analysis
-def analyze_attention_based_uncertainty(model):
-    """Analyze attention-based uncertainty estimation patterns"""
-    prediction_result = model.predict(test_data, return_uncertainty=True)
-    
-    if hasattr(model.ensemble_, 'transformer_meta_learner'):
-        attention_weights = model.ensemble_.transformer_meta_learner.get_attention_weights()
-        
-        return {
-            'attention_uncertainty_correlation': correlate_attention_uncertainty(attention_weights, prediction_result.uncertainty),
-            'attention_variance_patterns': calculate_attention_variance(attention_weights),
-            'learner_disagreement_attention': analyze_learner_disagreement_attention(attention_weights),
-            'uncertainty_attention_consistency': analyze_uncertainty_attention_consistency(attention_weights, prediction_result.uncertainty),
-            'attention_based_uncertainty_quality': evaluate_attention_uncertainty_quality(attention_weights, prediction_result.uncertainty)
-        }
-    
-    return {'error': 'Attention-based uncertainty not available'}
-Interpretability Questions:
-How do attention weights relate to prediction uncertainty?
-Which attention patterns indicate high uncertainty?
-How does learner disagreement manifest in attention weights?
-Is attention-based uncertainty more informative than traditional methods?
-
-5. Ensemble Prediction Consistency Analysis
-def analyze_ensemble_prediction_consistency(model):
-    """Analyze consistency of ensemble predictions across different aggregation strategies"""
-    strategies = ['transformer_fusion', 'dynamic_weighting', 'uncertainty_weighted', 'weighted_vote', 'majority_vote']
-    prediction_results = {}
-    
-    for strategy in strategies:
-        model_temp = MultiModalEnsembleModel(
-            aggregation_strategy=strategy,
-            uncertainty_method='entropy',
-            calibrate_uncertainty=True,
-            device='auto'
-        )
-        # Copy trained learners to temp model
-        model_temp.trained_learners_ = model.trained_learners_
-        model_temp.learner_metadata_ = model.learner_metadata_
-        
-        result = model_temp.predict(test_data, return_uncertainty=True)
-        prediction_results[strategy] = {
-            'predictions': result.predictions,
-            'confidence': result.confidence,
-            'uncertainty': result.uncertainty,
-            'modality_importance': result.modality_importance
-        }
-    
-    return {
-        'prediction_consistency': analyze_prediction_consistency(prediction_results),
-        'confidence_correlation': analyze_confidence_correlation(prediction_results),
-        'uncertainty_correlation': analyze_uncertainty_correlation(prediction_results),
-        'strategy_performance_comparison': compare_strategy_performance(prediction_results),
-        'ensemble_agreement_analysis': analyze_ensemble_agreement(prediction_results)
-    }
-Interpretability Questions:
-How consistent are predictions across different aggregation strategies?
-Which strategies produce the most reliable confidence estimates?
-Do different strategies agree on uncertain predictions?
-How does ensemble agreement vary with prediction difficulty?
-
-6. Modality Importance Analysis
-def analyze_modality_importance(model):
-    """Analyze how different modalities contribute to ensemble predictions"""
-    prediction_result = model.predict(test_data, return_uncertainty=True)
-    
-    return {
-        'modality_importance_scores': prediction_result.modality_importance,
-        'modality_contribution_patterns': analyze_modality_contribution_patterns(prediction_result),
-        'cross_modality_interactions': analyze_cross_modality_interactions(prediction_result),
-        'modality_importance_consistency': analyze_modality_importance_consistency(prediction_result),
-        'modality_importance_correlation': analyze_modality_importance_correlation(prediction_result)
-    }
-Interpretability Questions:
-Which modalities are most important for ensemble predictions?
-How do modality importance scores vary across different inputs?
-Are there interactions between modalities that affect importance?
-How consistent are modality importance estimates?
-
-7. Bag Reconstruction Effectiveness Analysis
-def analyze_bag_reconstruction_effectiveness(model):
-    """Analyze how well bag reconstruction preserves training conditions"""
-    reconstruction_results = []
-    
-    for i, bag_config in enumerate(model.ensemble_.bag_configs):
-        # Test reconstruction on different data
-        reconstructed_data = model.ensemble_._reconstruct_bag_data(bag_config, test_data)
-        
-        reconstruction_results.append({
-            'bag_id': i,
-            'modality_mask': bag_config.modality_mask,
-            'feature_mask': bag_config.feature_mask,
-            'reconstruction_accuracy': calculate_reconstruction_accuracy(bag_config, reconstructed_data),
-            'data_preservation': analyze_data_preservation(bag_config, reconstructed_data),
-            'reconstruction_consistency': analyze_reconstruction_consistency(bag_config, reconstructed_data)
-        })
-    
-    return {
-        'reconstruction_effectiveness': reconstruction_results,
-        'overall_reconstruction_quality': calculate_overall_reconstruction_quality(reconstruction_results),
-        'reconstruction_impact_on_predictions': analyze_reconstruction_impact(reconstruction_results),
-        'bag_diversity_preservation': analyze_bag_diversity_preservation(reconstruction_results)
-    }
-Interpretability Questions:
-How accurately does bag reconstruction preserve training conditions?
-Does reconstruction quality affect prediction accuracy?
-Are there systematic differences in reconstruction across bags?
-How does bag diversity affect reconstruction effectiveness?
-
-8. Complete Stage 5 Interpretability Analysis
-def comprehensive_stage5_interpretability_study(model):
-    """Comprehensive interpretability analysis for Stage 5 only"""
-    
-    results = {}
-    
-    # 1. Transformer fusion attention analysis
-    results['transformer_fusion_attention'] = analyze_transformer_fusion_attention(model)
-    
-    # 2. Dynamic weighting behavior analysis
-    results['dynamic_weighting_behavior'] = analyze_dynamic_weighting_behavior(model)
-    
-    # 3. Uncertainty-weighted aggregation analysis
-    results['uncertainty_weighted_aggregation'] = analyze_uncertainty_weighted_aggregation(model)
-    
-    # 4. Attention-based uncertainty estimation analysis
-    results['attention_based_uncertainty'] = analyze_attention_based_uncertainty(model)
-    
-    # 5. Ensemble prediction consistency analysis
-    results['ensemble_prediction_consistency'] = analyze_ensemble_prediction_consistency(model)
-    
-    # 6. Modality importance analysis
-    results['modality_importance'] = analyze_modality_importance(model)
-    
-    # 7. Bag reconstruction effectiveness analysis
-    results['bag_reconstruction_effectiveness'] = analyze_bag_reconstruction_effectiveness(model)
-    
-    return results
 
 //robustness tests
-1. Transformer Fusion Robustness
-def test_transformer_fusion_robustness():
-    """Test robustness of transformer-based meta-learner fusion"""
-    transformer_robustness_tests = {
-        'transformer_architectures': {
-            'num_heads': [2, 4, 8, 16],
-            'num_layers': [1, 2, 4, 6],
-            'hidden_dim': [64, 128, 256, 512]
-        },
-        'attention_patterns': ['uniform', 'focused', 'sparse', 'adaptive'],
-        'fusion_strategies': ['self_attention', 'cross_attention', 'hybrid', 'adaptive'],
-        'input_perturbations': [0.0, 0.05, 0.1, 0.2, 0.3],
-        'learner_disagreement_levels': ['low', 'medium', 'high', 'extreme']
+1. MODALITY-AWARE ENSEMBLE ROBUSTNESS TEST
+Test Name: Modality_Aware_Ensemble_Robustness
+Feature Being Tested: Modality-Aware Transformer Ensemble Aggregation - The moderately novel transformer meta-learner's robustness to noise, perturbations, and varying input conditions
+Robustness Questions:
+How does the modality-aware transformer meta-learner perform under different noise levels?
+How robust is the ensemble to missing or corrupted learner predictions?
+How does the system handle varying numbers of learners and modalities?
+What is the performance degradation under different perturbation scenarios?
+How robust is the novel signal integration scheme to signal corruption?
+Analysis Functions:
+def test_modality_aware_ensemble_robustness(model):
+    """Test modality-aware ensemble robustness"""
+    # Test with noise perturbation
+    noise_levels = [0.01, 0.05, 0.1]
+    robustness_scores = []
+    
+    for noise_level in noise_levels:
+        # Add noise to test data
+        noisy_data = add_noise_to_data(test_data, noise_level)
+        
+        # Make predictions on noisy data
+        result = model.predict(noisy_data)
+        
+        # Compute robustness score
+        robustness_score = calculate_robustness_score(result, test_labels)
+        robustness_scores.append(robustness_score)
+    
+    return {
+        'noise_robustness_scores': robustness_scores,
+        'overall_robustness_score': np.mean(robustness_scores),
+        'robustness_degradation': analyze_robustness_degradation(robustness_scores),
+        'learner_failure_robustness': test_learner_failure_robustness(model, test_data),
+        'modality_perturbation_robustness': test_modality_perturbation_robustness(model, test_data)
     }
-    Purpose: Test how robust transformer fusion is to different architectures and input conditions
-    Tests:
-    Architecture Robustness: Test with different transformer configurations
-    Attention Robustness: Test with different attention patterns
-    Fusion Robustness: Test with different fusion strategies
-    Perturbation Robustness: Test with input perturbations
-    Disagreement Robustness: Test with different learner disagreement levels
-
-2. Dynamic Weighting Robustness
-def test_dynamic_weighting_robustness():
-    """Test robustness of dynamic weighting system"""
-    dynamic_weighting_robustness_tests = {
-        'weighting_adaptation_speeds': ['slow', 'medium', 'fast', 'adaptive'],
-        'weight_update_frequencies': ['per_sample', 'per_batch', 'per_epoch', 'adaptive'],
-        'weight_constraints': ['unconstrained', 'normalized', 'bounded', 'sparse'],
-        'input_sensitivity_levels': ['low', 'medium', 'high', 'extreme'],
-        'weight_initialization_strategies': ['uniform', 'random', 'learner_based', 'adaptive']
-    }
-    Purpose: Test how robust dynamic weighting is to different adaptation scenarios
-    Tests:
-    Speed Robustness: Test with different adaptation speeds
-    Frequency Robustness: Test with different update frequencies
-    Constraint Robustness: Test with different weight constraints
-    Sensitivity Robustness: Test with different input sensitivity levels
-    Initialization Robustness: Test with different weight initialization strategies
-
-3. Uncertainty-Weighted Aggregation Robustness
-def test_uncertainty_weighted_aggregation_robustness():
-    """Test robustness of uncertainty-weighted aggregation"""
-    uncertainty_robustness_tests = {
-        'uncertainty_calibration_levels': ['well_calibrated', 'overconfident', 'underconfident', 'mixed'],
-        'uncertainty_thresholds': [0.1, 0.3, 0.5, 0.7, 0.9],
-        'uncertainty_noise_levels': [0.0, 0.05, 0.1, 0.2, 0.3],
-        'learner_uncertainty_patterns': ['consistent', 'variable', 'conflicting', 'extreme'],
-        'uncertainty_weighting_strategies': ['linear', 'exponential', 'sigmoid', 'adaptive']
-    }
-    Purpose: Test how robust uncertainty-weighted aggregation is to different uncertainty conditions
-    Tests:
-    Calibration Robustness: Test with different uncertainty calibration levels
-    Threshold Robustness: Test with different uncertainty thresholds
-    Noise Robustness: Test with different uncertainty noise levels
-    Pattern Robustness: Test with different learner uncertainty patterns
-    Strategy Robustness: Test with different uncertainty weighting strategies
-
-4. Attention-Based Uncertainty Robustness
-def test_attention_based_uncertainty_robustness():
-    """Test robustness of attention-based uncertainty estimation"""
-    attention_uncertainty_robustness_tests = {
-        'attention_uncertainty_correlations': ['strong', 'moderate', 'weak', 'none'],
-        'attention_variance_levels': ['low', 'medium', 'high', 'extreme'],
-        'attention_consistency_patterns': ['stable', 'variable', 'erratic', 'adaptive'],
-        'uncertainty_attention_feedback': ['positive', 'negative', 'neutral', 'adaptive'],
-        'attention_uncertainty_scaling': ['linear', 'logarithmic', 'exponential', 'adaptive']
-    }
-    Purpose: Test how robust attention-based uncertainty is to different attention patterns
-    Tests:
-    Correlation Robustness: Test with different attention-uncertainty correlations
-    Variance Robustness: Test with different attention variance levels
-    Consistency Robustness: Test with different attention consistency patterns
-    Feedback Robustness: Test with different uncertainty-attention feedback
-    Scaling Robustness: Test with different attention-uncertainty scaling methods
-
-5. Ensemble Prediction Consistency Robustness
-def test_ensemble_prediction_consistency_robustness():
-    """Test robustness of ensemble prediction consistency"""
-    consistency_robustness_tests = {
-        'aggregation_strategy_combinations': ['single_strategy', 'dual_strategy', 'multi_strategy', 'adaptive'],
-        'prediction_disagreement_levels': ['low', 'medium', 'high', 'extreme'],
-        'confidence_calibration_levels': ['well_calibrated', 'overconfident', 'underconfident', 'mixed'],
-        'ensemble_size_variations': [2, 4, 8, 16, 32],
-        'learner_quality_variations': ['uniform_high', 'uniform_medium', 'mixed_quality', 'extreme_variation']
-    }
-    Purpose: Test how robust ensemble predictions are to different consistency scenarios
-    Tests:
-    Strategy Robustness: Test with different aggregation strategy combinations
-    Disagreement Robustness: Test with different prediction disagreement levels
-    Calibration Robustness: Test with different confidence calibration levels
-    Size Robustness: Test with different ensemble sizes
-    Quality Robustness: Test with different learner quality variations
-
-6. Modality Importance Robustness
-def test_modality_importance_robustness():
-    """Test robustness of modality importance estimation"""
-    modality_importance_robustness_tests = {
-        'modality_quality_variations': ['uniform_high', 'uniform_medium', 'mixed_quality', 'extreme_variation'],
-        'modality_availability_patterns': ['all_available', 'partial_available', 'sequential_available', 'random_available'],
-        'modality_correlation_levels': ['independent', 'weakly_correlated', 'strongly_correlated', 'conflicting'],
-        'modality_importance_stability': ['stable', 'variable', 'erratic', 'adaptive'],
-        'cross_modality_interaction_strengths': ['weak', 'moderate', 'strong', 'extreme']
-    }
-    Purpose: Test how robust modality importance estimation is to different modality scenarios
-    Tests:
-    Quality Robustness: Test with different modality quality variations
-    Availability Robustness: Test with different modality availability patterns
-    Correlation Robustness: Test with different modality correlation levels
-    Stability Robustness: Test with different modality importance stability
-    Interaction Robustness: Test with different cross-modality interaction strengths
-
-7. Bag Reconstruction Robustness
-def test_bag_reconstruction_robustness():
-    """Test robustness of bag reconstruction system"""
-    bag_reconstruction_robustness_tests = {
-        'reconstruction_accuracy_levels': ['high', 'medium', 'low', 'variable'],
-        'bag_diversity_levels': ['low', 'medium', 'high', 'extreme'],
-        'modality_mask_variations': ['consistent', 'variable', 'erratic', 'adaptive'],
-        'feature_mask_variations': ['consistent', 'variable', 'erratic', 'adaptive'],
-        'reconstruction_noise_levels': [0.0, 0.05, 0.1, 0.2, 0.3]
-    }
-    Purpose: Test how robust bag reconstruction is to different reconstruction scenarios
-    Tests:
-    Accuracy Robustness: Test with different reconstruction accuracy levels
-    Diversity Robustness: Test with different bag diversity levels
-    Mask Robustness: Test with different modality and feature mask variations
-    Noise Robustness: Test with different reconstruction noise levels
-    Consistency Robustness: Test reconstruction consistency across different conditions
-
-8. Aggregation Strategy Robustness
-def test_aggregation_strategy_robustness():
-    """Test robustness of different aggregation strategies"""
-    aggregation_robustness_tests = {
-        'strategy_combinations': ['single', 'dual', 'multi', 'adaptive'],
-        'learner_weight_distributions': ['uniform', 'skewed', 'bimodal', 'extreme'],
-        'prediction_confidence_levels': ['low', 'medium', 'high', 'variable'],
-        'ensemble_disagreement_levels': ['low', 'medium', 'high', 'extreme'],
-        'strategy_switching_frequencies': ['never', 'rare', 'frequent', 'adaptive']
-    }
-    Purpose: Test how robust different aggregation strategies are to various conditions
-    Tests:
-    Combination Robustness: Test with different strategy combinations
-    Distribution Robustness: Test with different learner weight distributions
-    Confidence Robustness: Test with different prediction confidence levels
-    Disagreement Robustness: Test with different ensemble disagreement levels
-    Switching Robustness: Test with different strategy switching frequencies
-
-9. Prediction Pipeline Robustness
-def test_prediction_pipeline_robustness():
-    """Test robustness of the entire prediction pipeline"""
-    pipeline_robustness_tests = {
-        'pipeline_component_failures': ['none', 'single_component', 'multiple_components', 'cascading'],
-        'data_quality_variations': ['high', 'medium', 'low', 'mixed'],
-        'computational_constraints': ['unlimited', 'memory_limited', 'time_limited', 'both_limited'],
-        'pipeline_load_levels': ['light', 'medium', 'heavy', 'extreme'],
-        'error_recovery_strategies': ['graceful_degradation', 'fallback_modes', 'retry_mechanisms', 'adaptive']
-    }
-    Purpose: Test how robust the entire prediction pipeline is to different failure scenarios
-    Tests:
-    Failure Robustness: Test with different component failure scenarios
-    Quality Robustness: Test with different data quality variations
-    Constraint Robustness: Test with different computational constraints
-    Load Robustness: Test with different pipeline load levels
-    Recovery Robustness: Test with different error recovery strategies
-
-10. End-to-End Ensemble Robustness
-def test_end_to_end_ensemble_robustness():
-    """Test robustness of the entire ensemble system"""
-    end_to_end_robustness_tests = {
-        'ensemble_size_variations': [2, 4, 8, 16, 32, 64],
-        'learner_type_combinations': ['uniform', 'diverse', 'specialized', 'mixed'],
-        'training_quality_variations': ['uniform_high', 'uniform_medium', 'mixed_quality', 'extreme_variation'],
-        'prediction_scenario_complexity': ['simple', 'moderate', 'complex', 'extreme'],
-        'system_integration_levels': ['isolated', 'partial_integration', 'full_integration', 'distributed']
-    }
-    Purpose: Test how robust the entire ensemble system is to different end-to-end scenarios
-    Tests:
-    Size Robustness: Test with different ensemble sizes
-    Type Robustness: Test with different learner type combinations
-    Quality Robustness: Test with different training quality variations
-    Complexity Robustness: Test with different prediction scenario complexities
-    Integration Robustness: Test with different system integration levels
-
-def test_end_to_end_ensemble_robustness():
-    """Test robustness of the entire ensemble system"""
-    end_to_end_robustness_tests = {
-        'ensemble_size_variations': [2, 4, 8, 16, 32, 64],
-        'learner_type_combinations': ['uniform', 'diverse', 'specialized', 'mixed'],
-        'training_quality_variations': ['uniform_high', 'uniform_medium', 'mixed_quality', 'extreme_variation'],
-        'prediction_scenario_complexity': ['simple', 'moderate', 'complex', 'extreme'],
-        'system_integration_levels': ['isolated', 'partial_integration', 'full_integration', 'distributed']
-    }
-    Purpose: Test how robust the entire ensemble system is to different end-to-end scenarios
-    Tests:
-    Size Robustness: Test with different ensemble sizes
-    Type Robustness: Test with different learner type combinations
-    Quality Robustness: Test with different training quality variations
-    Complexity Robustness: Test with different prediction scenario complexities
-    Integration Robustness: Test with different system integration levels
-def comprehensive_stage5_robustness_study():
-    """Comprehensive robustness analysis for Stage 5 only"""
-    
-    results = {}
-    
-    # 1. Transformer fusion robustness
-    results['transformer_fusion'] = test_transformer_fusion_robustness()
-    
-    # 2. Dynamic weighting robustness
-    results['dynamic_weighting'] = test_dynamic_weighting_robustness()
-    
-    # 3. Uncertainty-weighted aggregation robustness
-    results['uncertainty_weighted_aggregation'] = test_uncertainty_weighted_aggregation_robustness()
-    
-    # 4. Attention-based uncertainty robustness
-    results['attention_based_uncertainty'] = test_attention_based_uncertainty_robustness()
-    
-    # 5. Ensemble prediction consistency robustness
-    results['ensemble_prediction_consistency'] = test_ensemble_prediction_consistency_robustness()
-    
-    # 6. Modality importance robustness
-    results['modality_importance'] = test_modality_importance_robustness()
-    
-    # 7. Bag reconstruction robustness
-    results['bag_reconstruction'] = test_bag_reconstruction_robustness()
-    
-    # 8. Aggregation strategy robustness
-    results['aggregation_strategy'] = test_aggregation_strategy_robustness()
-    
-    # 9. Prediction pipeline robustness
-    results['prediction_pipeline'] = test_prediction_pipeline_robustness()
-    
-    # 10. End-to-end ensemble robustness
-    results['end_to_end_ensemble'] = test_end_to_end_ensemble_robustness()
-    
-    return results

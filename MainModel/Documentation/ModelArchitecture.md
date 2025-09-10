@@ -2,12 +2,12 @@
 
 ## Overview
 
-The **Modality-Aware Ensemble Framework** implements a comprehensive 6-stage pipeline for multimodal ensemble learning, processing heterogeneous data types (text, images, tabular, audio) with intelligent architecture selection and advanced ensemble generation.
+The **Modality-Aware Ensemble Framework** implements a comprehensive 5-stage pipeline for multimodal ensemble learning, processing heterogeneous data types (text, images, tabular, audio) with intelligent architecture selection and advanced ensemble generation.
 
-## 6-Stage Pipeline Architecture
+## 5-Stage Pipeline Architecture
 
 ```
-Stage 1: Data Integration → Stage 2: Ensemble Generation → Stage 3: Learner Selection → Stage 4: Training Pipeline → Stage 5: Ensemble Prediction → Stage 6: Performance Evaluation
+Stage 1: Data Integration → Stage 2: Ensemble Generation → Stage 3: Learner Selection → Stage 4: Training Pipeline → Stage 5: Ensemble Prediction
 ```
 
 ### Core Components
@@ -17,8 +17,7 @@ Stage 1: Data Integration → Stage 2: Ensemble Generation → Stage 3: Learner 
 - **`modalityAwareBaseLearnerSelector.py`** (Stage 3): Intelligent learner selection
 - **`trainingPipeline.py`** (Stage 4): Production-grade training engine
 - **`ensemblePrediction.py`** (Stage 5): Advanced prediction and uncertainty quantification
-- **`performanceMetrics.py`** (Stage 6): Comprehensive evaluation and benchmarking
-- **`mainModel.py`** (Main Orchestrator): Unified sklearn-like interface
+- **`mainModelAPI.py`** (Main Orchestrator): Unified sklearn-like interface
 
 ## Stage 1: Data Integration (`dataIntegration.py`)
 
@@ -150,25 +149,7 @@ def predict_learner_performance(self, learner_type: str, bag: BagConfig) -> floa
 - **Ensemble Disagreement**: Model disagreement uncertainty
 - **Attention-based**: Attention-based uncertainty estimation
 
-## Stage 6: Performance Evaluation (`performanceMetrics.py`)
-
-### `PerformanceEvaluator` Class
-
-**Metrics Categories:**
-- **Quality**: Accuracy, F1-score, AUC-ROC, precision, recall
-- **Regression**: MSE, MAE, RMSE, R² score, MAPE
-- **Uncertainty/Calibration**: ECE, Brier score, prediction entropy
-- **Efficiency**: Inference time, throughput, memory usage
-- **Multimodal**: Cross-modal consistency, modality importance, missing modality robustness
-
-### `ModelComparator` Class
-
-**Features:**
-- **Model Comparison**: Compares multiple models
-- **Statistical Testing**: Significance testing for performance differences
-- **Comprehensive Analysis**: Detailed comparison reports
-
-## Main Orchestrator (`mainModel.py`)
+## Main Orchestrator (`mainModelAPI.py`)
 
 ### `MultiModalEnsembleModel` Class
 
@@ -224,8 +205,6 @@ Stage 3: Learner Selection (modalityAwareBaseLearnerSelector.py)
 Stage 4: Training Pipeline (trainingPipeline.py)
     ↓
 Stage 5: Ensemble Prediction (ensemblePrediction.py)
-    ↓
-Stage 6: Performance Evaluation (performanceMetrics.py)
     ↓
 Production-Ready Ensemble Model
 ```
