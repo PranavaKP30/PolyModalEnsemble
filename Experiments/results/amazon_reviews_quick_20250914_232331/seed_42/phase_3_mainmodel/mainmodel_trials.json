@@ -1,0 +1,2177 @@
+[
+  {
+    "number": 0,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 20,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 0.9,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.0001,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 64,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 15,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.048,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.004413793103448276,
+      "weighted_precision": 0.002313253012048193,
+      "weighted_recall": 0.048
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 1,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 15,
+      "max_dropout_rate": 0.6,
+      "sample_ratio": 0.9,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.0005,
+      "epochs": 100,
+      "denoising_weight": 0.1,
+      "batch_size": 32,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 15,
+      "label_smoothing": 0.0,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45,
+      "weighted_precision": 0.36,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 2,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.6,
+      "sample_ratio": 1.0,
+      "optimization_mode": "performance",
+      "learning_rate": 0.0001,
+      "epochs": 150,
+      "denoising_weight": 0.2,
+      "batch_size": 32,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 25,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45,
+      "weighted_precision": 0.36,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 3,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 15,
+      "max_dropout_rate": 0.6,
+      "sample_ratio": 1.0,
+      "optimization_mode": "performance",
+      "learning_rate": 0.0001,
+      "epochs": 100,
+      "denoising_weight": 0.2,
+      "batch_size": 64,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 15,
+      "label_smoothing": 0.0,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45,
+      "weighted_precision": 0.36,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 4,
+    "value": 0.20952380952380953,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.0001,
+      "epochs": 50,
+      "denoising_weight": 0.15,
+      "batch_size": 64,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.604,
+      "balanced_accuracy": 0.20952380952380953,
+      "weighted_f1": 0.46540589569160995,
+      "weighted_precision": 0.38590082644628104,
+      "weighted_recall": 0.604
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 5,
+    "value": 0.19166666666666668,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.0001,
+      "epochs": 50,
+      "denoising_weight": 0.15,
+      "batch_size": 64,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 25,
+      "label_smoothing": 0.0,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.048,
+      "balanced_accuracy": 0.19166666666666668,
+      "weighted_f1": 0.010580838965776204,
+      "weighted_precision": 0.007679754836238269,
+      "weighted_recall": 0.048
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 6,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 0.8,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.002,
+      "epochs": 50,
+      "denoising_weight": 0.25,
+      "batch_size": 32,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.064,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.007728301886792453,
+      "weighted_precision": 0.004112449799196787,
+      "weighted_recall": 0.064
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 7,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.9,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.0005,
+      "epochs": 50,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 15,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45,
+      "weighted_precision": 0.36,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 8,
+    "value": 0.2585126050420168,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.6,
+      "sample_ratio": 0.9,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 25,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.2585126050420168,
+      "weighted_f1": 0.508738999562529,
+      "weighted_precision": 0.5404056390977444,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 9,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 1.0,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.002,
+      "epochs": 150,
+      "denoising_weight": 0.2,
+      "batch_size": 64,
+      "weight_decay": 0.0001,
+      "early_stopping_patience": 25,
+      "label_smoothing": 0.0,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.084,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.013018450184501847,
+      "weighted_precision": 0.007056,
+      "weighted_recall": 0.084
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 10,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 20,
+      "max_dropout_rate": 0.6,
+      "sample_ratio": 0.9,
+      "optimization_mode": "performance",
+      "learning_rate": 0.001,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 0.0001,
+      "early_stopping_patience": 10,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45,
+      "weighted_precision": 0.36,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 11,
+    "value": 0.3174327731092437,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.628,
+      "balanced_accuracy": 0.3174327731092437,
+      "weighted_f1": 0.571982605718199,
+      "weighted_precision": 0.58,
+      "weighted_recall": 0.628
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 12,
+    "value": 0.3174327731092437,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.628,
+      "balanced_accuracy": 0.3174327731092437,
+      "weighted_f1": 0.571982605718199,
+      "weighted_precision": 0.58,
+      "weighted_recall": 0.628
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 13,
+    "value": 0.3174327731092437,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.628,
+      "balanced_accuracy": 0.3174327731092437,
+      "weighted_f1": 0.571982605718199,
+      "weighted_precision": 0.58,
+      "weighted_recall": 0.628
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 14,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 20,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45112781954887216,
+      "weighted_precision": 0.3614457831325302,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 15,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 15,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.001,
+      "epochs": 75,
+      "denoising_weight": 0.1,
+      "batch_size": 16,
+      "weight_decay": 0.0001,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45112781954887216,
+      "weighted_precision": 0.3614457831325302,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 16,
+    "value": 0.2643809523809524,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 10,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.612,
+      "balanced_accuracy": 0.2643809523809524,
+      "weighted_f1": 0.5466883858704802,
+      "weighted_precision": 0.5608963893249608,
+      "weighted_recall": 0.612
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 17,
+    "value": 0.3174327731092437,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.628,
+      "balanced_accuracy": 0.3174327731092437,
+      "weighted_f1": 0.571982605718199,
+      "weighted_precision": 0.58,
+      "weighted_recall": 0.628
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 18,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 20,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45112781954887216,
+      "weighted_precision": 0.3614457831325302,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 19,
+    "value": 0.19866666666666666,
+    "state": "1",
+    "params": {
+      "n_bags": 15,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.0005,
+      "epochs": 75,
+      "denoising_weight": 0.1,
+      "batch_size": 16,
+      "weight_decay": 0.0001,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.19866666666666666,
+      "weighted_f1": 0.44812030075187964,
+      "weighted_precision": 0.3590361445783133,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 20,
+    "value": 0.19033333333333333,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 1.0,
+      "optimization_mode": "performance",
+      "learning_rate": 0.001,
+      "epochs": 150,
+      "denoising_weight": 0.25,
+      "batch_size": 32,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 10,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.504,
+      "balanced_accuracy": 0.19033333333333333,
+      "weighted_f1": 0.4189759077359136,
+      "weighted_precision": 0.3591028124635313,
+      "weighted_recall": 0.504
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 21,
+    "value": 0.3174327731092437,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.628,
+      "balanced_accuracy": 0.3174327731092437,
+      "weighted_f1": 0.571982605718199,
+      "weighted_precision": 0.58,
+      "weighted_recall": 0.628
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 22,
+    "value": 0.3174327731092437,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.628,
+      "balanced_accuracy": 0.3174327731092437,
+      "weighted_f1": 0.571982605718199,
+      "weighted_precision": 0.58,
+      "weighted_recall": 0.628
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 23,
+    "value": 0.3174327731092437,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.628,
+      "balanced_accuracy": 0.3174327731092437,
+      "weighted_f1": 0.571982605718199,
+      "weighted_precision": 0.58,
+      "weighted_recall": 0.628
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 24,
+    "value": 0.3174327731092437,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "confidence"
+    },
+    "user_attrs": {
+      "accuracy": 0.628,
+      "balanced_accuracy": 0.3174327731092437,
+      "weighted_f1": 0.571982605718199,
+      "weighted_precision": 0.58,
+      "weighted_recall": 0.628
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 25,
+    "value": 0.318766106442577,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 12,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.632,
+      "balanced_accuracy": 0.318766106442577,
+      "weighted_f1": 0.5748071052578094,
+      "weighted_precision": 0.583339246119734,
+      "weighted_recall": 0.632
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 26,
+    "value": 0.318766106442577,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.25,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.632,
+      "balanced_accuracy": 0.318766106442577,
+      "weighted_f1": 0.5748071052578094,
+      "weighted_precision": 0.583339246119734,
+      "weighted_recall": 0.632
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 27,
+    "value": 0.318766106442577,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.2,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.632,
+      "balanced_accuracy": 0.318766106442577,
+      "weighted_f1": 0.5748071052578094,
+      "weighted_precision": 0.583339246119734,
+      "weighted_recall": 0.632
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 28,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 20,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 1.0,
+      "optimization_mode": "performance",
+      "learning_rate": 0.001,
+      "epochs": 150,
+      "denoising_weight": 0.2,
+      "batch_size": 32,
+      "weight_decay": 0.0001,
+      "early_stopping_patience": 10,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.064,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.00781679389312977,
+      "weighted_precision": 0.004162601626016261,
+      "weighted_recall": 0.064
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 29,
+    "value": 0.20250980392156864,
+    "state": "1",
+    "params": {
+      "n_bags": 15,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.0005,
+      "epochs": 100,
+      "denoising_weight": 0.2,
+      "batch_size": 16,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 15,
+      "label_smoothing": 0.0,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.592,
+      "balanced_accuracy": 0.20250980392156864,
+      "weighted_f1": 0.4644987727049583,
+      "weighted_precision": 0.40206722689075636,
+      "weighted_recall": 0.592
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 30,
+    "value": 0.21442577030812324,
+    "state": "1",
+    "params": {
+      "n_bags": 20,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 0.9,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.2,
+      "batch_size": 64,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.148,
+      "balanced_accuracy": 0.21442577030812324,
+      "weighted_f1": 0.07816067101584344,
+      "weighted_precision": 0.05991625207296849,
+      "weighted_recall": 0.148
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 31,
+    "value": 0.318766106442577,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.2,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.632,
+      "balanced_accuracy": 0.318766106442577,
+      "weighted_f1": 0.5748071052578094,
+      "weighted_precision": 0.583339246119734,
+      "weighted_recall": 0.632
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 32,
+    "value": 0.318766106442577,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.2,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.632,
+      "balanced_accuracy": 0.318766106442577,
+      "weighted_f1": 0.5748071052578094,
+      "weighted_precision": 0.583339246119734,
+      "weighted_recall": 0.632
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 33,
+    "value": 0.318766106442577,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.2,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.632,
+      "balanced_accuracy": 0.318766106442577,
+      "weighted_f1": 0.5748071052578094,
+      "weighted_precision": 0.583339246119734,
+      "weighted_recall": 0.632
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 34,
+    "value": 0.22862745098039214,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.6,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.2,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 15,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.616,
+      "balanced_accuracy": 0.22862745098039214,
+      "weighted_f1": 0.5099103046901746,
+      "weighted_precision": 0.4786233766233766,
+      "weighted_recall": 0.616
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 35,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 15,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.0001,
+      "epochs": 75,
+      "denoising_weight": 0.1,
+      "batch_size": 32,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.0,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.048,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.0043969465648854966,
+      "weighted_precision": 0.002304,
+      "weighted_recall": 0.048
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 36,
+    "value": 0.20784313725490197,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 1.0,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.0005,
+      "epochs": 150,
+      "denoising_weight": 0.2,
+      "batch_size": 64,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 25,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.608,
+      "balanced_accuracy": 0.20784313725490197,
+      "weighted_f1": 0.4676575329477577,
+      "weighted_precision": 0.5669032258064517,
+      "weighted_recall": 0.608
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 37,
+    "value": 0.19776470588235295,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.6,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.0001,
+      "epochs": 50,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.432,
+      "balanced_accuracy": 0.19776470588235295,
+      "weighted_f1": 0.40540993788819873,
+      "weighted_precision": 0.4802139534883721,
+      "weighted_recall": 0.43200000000000005
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 38,
+    "value": 0.22070588235294117,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.9,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.002,
+      "epochs": 75,
+      "denoising_weight": 0.2,
+      "batch_size": 32,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 15,
+      "label_smoothing": 0.0,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.22070588235294117,
+      "weighted_f1": 0.4972995974698103,
+      "weighted_precision": 0.4479476721816083,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 39,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 40,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.6,
+      "sample_ratio": 1.0,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.0001,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 64,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 25,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45,
+      "weighted_precision": 0.36,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 41,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 42,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 43,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 44,
+    "value": 0.358109243697479,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.588,
+      "balanced_accuracy": 0.358109243697479,
+      "weighted_f1": 0.5695471366173258,
+      "weighted_precision": 0.5584710578842316,
+      "weighted_recall": 0.588
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 45,
+    "value": 0.23532773109243696,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.9,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.23532773109243696,
+      "weighted_f1": 0.51130773527626,
+      "weighted_precision": 0.4763555555555556,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 46,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.064,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.007728301886792453,
+      "weighted_precision": 0.004112449799196787,
+      "weighted_recall": 0.064
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 47,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 15,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.0005,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 0.0001,
+      "early_stopping_patience": 25,
+      "label_smoothing": 0.0,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45226130653266333,
+      "weighted_precision": 0.3629032258064516,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 48,
+    "value": 0.24583753501400557,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.001,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 64,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 10,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.612,
+      "balanced_accuracy": 0.24583753501400557,
+      "weighted_f1": 0.5299030303030304,
+      "weighted_precision": 0.5491428571428572,
+      "weighted_recall": 0.612
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 49,
+    "value": 0.29424929971988795,
+    "state": "1",
+    "params": {
+      "n_bags": 20,
+      "max_dropout_rate": 0.6,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.564,
+      "balanced_accuracy": 0.29424929971988795,
+      "weighted_f1": 0.5229478446277926,
+      "weighted_precision": 0.5310090090090089,
+      "weighted_recall": 0.564
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 50,
+    "value": 0.2996610644257703,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.9,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 15,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.588,
+      "balanced_accuracy": 0.2996610644257703,
+      "weighted_f1": 0.5364350211879623,
+      "weighted_precision": 0.504896992481203,
+      "weighted_recall": 0.588
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 51,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 52,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 53,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 54,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 55,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 56,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 32,
+      "weight_decay": 0.0001,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 57,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.0001,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.064,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.007699248120300752,
+      "weighted_precision": 0.004096,
+      "weighted_recall": 0.064
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 58,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 1.0,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.204,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.0691295681063123,
+      "weighted_precision": 0.041616,
+      "weighted_recall": 0.204
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 59,
+    "value": 0.19866666666666666,
+    "state": "1",
+    "params": {
+      "n_bags": 15,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.001,
+      "epochs": 50,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 10,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.19866666666666666,
+      "weighted_f1": 0.4492462311557789,
+      "weighted_precision": 0.3604838709677419,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 60,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 61,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 62,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 63,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 64,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 65,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 20,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.1,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45112781954887216,
+      "weighted_precision": 0.3614457831325302,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 66,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 67,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.0005,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 0.0001,
+      "early_stopping_patience": 25,
+      "label_smoothing": 0.0,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.45,
+      "weighted_precision": 0.36,
+      "weighted_recall": 0.6
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 68,
+    "value": 0.22121008403361345,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 50,
+      "denoising_weight": 0.15,
+      "batch_size": 64,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.608,
+      "balanced_accuracy": 0.22121008403361345,
+      "weighted_f1": 0.49092587412587413,
+      "weighted_precision": 0.5176048632218845,
+      "weighted_recall": 0.608
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 69,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 150,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.064,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.007728301886792453,
+      "weighted_precision": 0.004112449799196787,
+      "weighted_recall": 0.064
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 70,
+    "value": 0.24649439775910365,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.9,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 32,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.24649439775910365,
+      "weighted_f1": 0.5194970839816856,
+      "weighted_precision": 0.5355298578199051,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 71,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 72,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 73,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  },
+  {
+    "number": 74,
+    "value": 0.3633641456582633,
+    "state": "1",
+    "params": {
+      "n_bags": 25,
+      "max_dropout_rate": 0.5,
+      "sample_ratio": 0.8,
+      "optimization_mode": "performance",
+      "learning_rate": 0.002,
+      "epochs": 100,
+      "denoising_weight": 0.1,
+      "batch_size": 16,
+      "weight_decay": 1e-05,
+      "early_stopping_patience": 20,
+      "label_smoothing": 0.2,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 512,
+      "uncertainty_method": "entropy"
+    },
+    "user_attrs": {
+      "accuracy": 0.596,
+      "balanced_accuracy": 0.3633641456582633,
+      "weighted_f1": 0.5757508395715502,
+      "weighted_precision": 0.5668482029086397,
+      "weighted_recall": 0.596
+    },
+    "system_attrs": {}
+  }
+]

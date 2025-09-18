@@ -33,41 +33,22 @@ venv.bak/
 # CatBoost temporary files (auto-generated during training)
 catboost_info/
 
-# Experiment results (comment out if you want to track results)
-# results/
-# *.pkl
-# *.json
-
 # Model checkpoints and temporary files
 *.tmp
 *.temp
 checkpoint*/
 logs/
 
-# Data files (if too large for git)
-# *.csv
-# *.json
-# *.pkl
-# *.npy
+#Data folders
+Data/AmazonReviews/
+Data/EuroSAT/
+Data/OASIS/
+Data/OULAD/
 
-# Benchmarking datasets (large data folders)
-Benchmarking/Data/AmazonReviews/
-Benchmarking/Data/ChestXRay(NotActive)/
-Benchmarking/Data/ChestXRay14(NotActive)/
-Benchmarking/Data/CocoCaptions/
-Benchmarking/Data/YelpOpen/
-
-# Benchmarking processed data folders
-Benchmarking/ProcessedData/AmazonReviews/
-Benchmarking/ProcessedData/ChestXRay(NotActive)/
-Benchmarking/ProcessedData/ChestXRay14(NotActive)/
-Benchmarking/ProcessedData/CocoCaptions/
-Benchmarking/ProcessedData/YelpOpen/
-
-# ProcessedData folders (alternative paths)
+# ProcessedData folders
 ProcessedData/AmazonReviews/
-ProcessedData/CocoCaptions/
-ProcessedData/YelpOpen/
+ProcessedData/EuroSAT/
+ProcessedData/OASIS/
+ProcessedData/OULAD/
 
-# Old processed data backup folder
-Benchmarking/ProcessedData(Old)/
+

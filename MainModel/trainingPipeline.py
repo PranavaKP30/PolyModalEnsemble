@@ -21,6 +21,7 @@ class AdvancedTrainingConfig:
     batch_size: int = 32
     learning_rate: float = 5e-4  # Reduced from 1e-3 for better generalization
     weight_decay: float = 1e-3  # Increased from 1e-4 for better regularization
+    random_state: int = 42  # Random seed for reproducibility
 
     # Task type
     task_type: str = "classification"
@@ -133,11 +134,18 @@ class AdvancedCrossModalDenoisingLoss(nn.Module):
     def forward(self, learner: nn.Module, modality_data: Dict[str, torch.Tensor], epoch: int = 0, original_representations: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Dict[str, float]]:
         losses = {}
         total_loss = 0.0
+        
+        # Concatenate all modality data for single-input learners (same as training loop)
+        if len(modality_data) > 1:
+            concatenated_data = torch.cat([modality_data[mod] for mod in modality_data.keys()], dim=1)
+        else:
+            concatenated_data = next(iter(modality_data.values()))
+        
         # Example: Reconstruction
         if 'reconstruction' in self.config.denoising_objectives:
             for mod, data in modality_data.items():
-                # Dummy: Predict itself (replace with real cross-modal logic)
-                pred = learner(data)
+                # Use concatenated data instead of individual modality data
+                pred = learner(concatenated_data)
                 # Handle dimension mismatch by using only the first modality for reconstruction
                 if pred.shape != data.shape:
                     # Use a simple identity loss instead
@@ -149,7 +157,8 @@ class AdvancedCrossModalDenoisingLoss(nn.Module):
         # Example: Consistency
         if 'consistency' in self.config.denoising_objectives and original_representations is not None:
             for mod, data in modality_data.items():
-                pred = learner(data)
+                # Use concatenated data instead of individual modality data
+                pred = learner(concatenated_data)
                 orig = original_representations.get(mod, data)
                 cons_loss = self.consistency_loss(torch.log_softmax(pred, dim=-1), torch.softmax(orig, dim=-1))
                 losses[f"consistency_{mod}"] = cons_loss.item()
@@ -173,6 +182,17 @@ class EnsembleTrainingPipeline:
         """
         import sklearn.metrics as skm
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Set random seeds for reproducibility
+        if hasattr(self.config, 'random_state'):
+            torch.manual_seed(self.config.random_state)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed(self.config.random_state)
+                torch.cuda.manual_seed_all(self.config.random_state)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            np.random.seed(self.config.random_state)
+        
         all_metrics = {}
         trained_learners = {}
         if bag_labels is None:
@@ -187,6 +207,7 @@ class EnsembleTrainingPipeline:
                     # Build layers with actual data dimensions
                     data = {k: torch.tensor(v, dtype=torch.float32, device=device) for k, v in bag_data[learner_id].items() if k != 'labels'}
                     concatenated_data = torch.cat([data[k] for k in data], dim=1)
+                    
                     # Trigger layer building by calling forward once
                     _ = learner(concatenated_data)
                 
@@ -220,11 +241,17 @@ class EnsembleTrainingPipeline:
                     
                     if self.config.task_type == "classification":
                         if output.shape[-1] > 1:
+                            # Calculate class weights for imbalanced datasets
+                            unique_labels, counts = torch.unique(labels, return_counts=True)
+                            total_samples = len(labels)
+                            class_weights = total_samples / (len(unique_labels) * counts.float())
+                            class_weights = class_weights / class_weights.sum() * len(unique_labels)  # Normalize
+                            
                             # Use label smoothing for better generalization
                             if self.config.label_smoothing > 0:
-                                loss_fn = nn.CrossEntropyLoss(label_smoothing=self.config.label_smoothing)
+                                loss_fn = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=self.config.label_smoothing)
                             else:
-                                loss_fn = nn.CrossEntropyLoss()
+                                loss_fn = nn.CrossEntropyLoss(weight=class_weights)
                             loss = loss_fn(output, labels)
                         else:
                             loss_fn = nn.BCEWithLogitsLoss()
@@ -356,12 +383,19 @@ class EnsembleTrainingPipeline:
                         # Skip loading if architecture changed
                         pass
                 
+                # Mark the learner as fitted and set to eval mode
+                learner.is_fitted = True
+                learner.eval()
                 trained_learners[learner_id] = learner.cpu()
                 all_metrics[learner_id] = metrics
             else:
-                # Non-torch learner: just fit once, no epochs/optimizer
-                X = {k: v for k, v in bag_data[learner_id].items() if k != 'labels'}
+                # Non-torch learner (sklearn): just fit once, no epochs/optimizer
+                X_dict = {k: v for k, v in bag_data[learner_id].items() if k != 'labels'}
                 y = bag_labels[learner_id]
+                
+                # Concatenate features for sklearn models
+                X = np.concatenate([X_dict[k] for k in X_dict.keys()], axis=1)
+                
                 learner.fit(X, y)
                 # Predict on train data for metrics
                 y_pred = learner.predict(X)

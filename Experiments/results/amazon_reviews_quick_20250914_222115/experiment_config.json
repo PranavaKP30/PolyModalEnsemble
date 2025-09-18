@@ -1,0 +1,85 @@
+{
+  "test_mode": "quick",
+  "seeds": [
+    42
+  ],
+  "n_bags": [
+    3,
+    5
+  ],
+  "dropout_strategy": [
+    "linear",
+    "adaptive"
+  ],
+  "max_dropout_rate": [
+    0.3,
+    0.5
+  ],
+  "sample_ratio": [
+    0.7,
+    0.8
+  ],
+  "diversity_target": [
+    0.6,
+    0.7
+  ],
+  "epochs": [
+    5,
+    10
+  ],
+  "batch_size": [
+    32,
+    64
+  ],
+  "early_stopping_patience": [
+    3,
+    5
+  ],
+  "cross_validation_folds": 5,
+  "optimization_strategy": [
+    "balanced",
+    "accuracy"
+  ],
+  "performance_threshold": [
+    0.6,
+    0.7
+  ],
+  "optimizer_type": [
+    "adamw",
+    "adam"
+  ],
+  "dropout_rate": [
+    0.2,
+    0.3
+  ],
+  "aggregation_strategy": [
+    "weighted_vote",
+    "confidence_weighted"
+  ],
+  "uncertainty_method": [
+    "entropy",
+    "variance"
+  ],
+  "normalize_data": [
+    true,
+    false
+  ],
+  "remove_outliers": [
+    true,
+    false
+  ],
+  "ablation_trials": 2,
+  "robustness_tests": [
+    "missing_modality",
+    "noise"
+  ],
+  "interpretability_depth": "basic",
+  "production_tests": false,
+  "dataset_name": "AmazonReviews",
+  "task_type": "classification",
+  "modalities": [
+    "text",
+    "metadata"
+  ],
+  "timestamp": "2025-09-14T22:21:15.606478"
+}

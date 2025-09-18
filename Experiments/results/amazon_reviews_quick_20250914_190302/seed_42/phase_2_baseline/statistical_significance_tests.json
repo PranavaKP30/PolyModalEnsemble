@@ -1,0 +1,204 @@
+{
+  "best_model": "Advanced Ensemble (Voting)",
+  "best_score": 0.6485,
+  "model_rankings": [
+    [
+      "Advanced Ensemble (Voting)",
+      0.6485
+    ],
+    [
+      "XGBoost + BERT-like Features",
+      0.646
+    ],
+    [
+      "boosting_multimodal",
+      0.6435
+    ],
+    [
+      "LightGBM + Multimodal",
+      0.642
+    ],
+    [
+      "text_tfidf_svm",
+      0.6325
+    ],
+    [
+      "early_fusion_rf",
+      0.6325
+    ],
+    [
+      "bagging_multimodal",
+      0.6165
+    ],
+    [
+      "stacking_meta",
+      0.6085
+    ],
+    [
+      "late_fusion_weighted",
+      0.599
+    ],
+    [
+      "text_tfidf_rf",
+      0.5975
+    ],
+    [
+      "metadata_svm",
+      0.5965
+    ],
+    [
+      "metadata_xgb",
+      0.581
+    ],
+    [
+      "metadata_rf",
+      0.5745
+    ]
+  ],
+  "performance_differences": {
+    "Advanced Ensemble (Voting)_vs_text_tfidf_svm": {
+      "difference": 0.016000000000000014,
+      "percentage_improvement": 2.529644268774706,
+      "effect_size": "small"
+    },
+    "Advanced Ensemble (Voting)_vs_text_tfidf_rf": {
+      "difference": 0.050999999999999934,
+      "percentage_improvement": 8.535564853556474,
+      "effect_size": "small"
+    },
+    "Advanced Ensemble (Voting)_vs_metadata_rf": {
+      "difference": 0.07399999999999995,
+      "percentage_improvement": 12.88076588337684,
+      "effect_size": "medium"
+    },
+    "Advanced Ensemble (Voting)_vs_metadata_xgb": {
+      "difference": 0.0675,
+      "percentage_improvement": 11.617900172117041,
+      "effect_size": "medium"
+    },
+    "Advanced Ensemble (Voting)_vs_metadata_svm": {
+      "difference": 0.051999999999999935,
+      "percentage_improvement": 8.717518860016753,
+      "effect_size": "small"
+    },
+    "Advanced Ensemble (Voting)_vs_early_fusion_rf": {
+      "difference": 0.016000000000000014,
+      "percentage_improvement": 2.529644268774706,
+      "effect_size": "small"
+    },
+    "Advanced Ensemble (Voting)_vs_late_fusion_weighted": {
+      "difference": 0.04949999999999999,
+      "percentage_improvement": 8.263772954924873,
+      "effect_size": "small"
+    },
+    "Advanced Ensemble (Voting)_vs_bagging_multimodal": {
+      "difference": 0.03199999999999992,
+      "percentage_improvement": 5.190592051905907,
+      "effect_size": "small"
+    },
+    "Advanced Ensemble (Voting)_vs_boosting_multimodal": {
+      "difference": 0.0050000000000000044,
+      "percentage_improvement": 0.7770007770007777,
+      "effect_size": "small"
+    },
+    "Advanced Ensemble (Voting)_vs_stacking_meta": {
+      "difference": 0.039999999999999925,
+      "percentage_improvement": 6.573541495480677,
+      "effect_size": "small"
+    },
+    "Advanced Ensemble (Voting)_vs_XGBoost + BERT-like Features": {
+      "difference": 0.0024999999999999467,
+      "percentage_improvement": 0.3869969040247595,
+      "effect_size": "small"
+    },
+    "Advanced Ensemble (Voting)_vs_LightGBM + Multimodal": {
+      "difference": 0.00649999999999995,
+      "percentage_improvement": 1.0124610591900234,
+      "effect_size": "small"
+    }
+  },
+  "significance_notes": {
+    "note": "Statistical significance tests require multiple runs per model. For single-run experiments, performance differences are reported.",
+    "recommendation": "Run each model 5-10 times with different seeds for proper statistical testing."
+  },
+  "confidence_intervals": {
+    "text_tfidf_svm": {
+      "score": 0.6325,
+      "ci_lower": 0.570515,
+      "ci_upper": 0.6944849999999999,
+      "margin_of_error": 0.061985
+    },
+    "text_tfidf_rf": {
+      "score": 0.5975,
+      "ci_lower": 0.538945,
+      "ci_upper": 0.656055,
+      "margin_of_error": 0.058555
+    },
+    "metadata_rf": {
+      "score": 0.5745,
+      "ci_lower": 0.518199,
+      "ci_upper": 0.6308010000000001,
+      "margin_of_error": 0.056301
+    },
+    "metadata_xgb": {
+      "score": 0.581,
+      "ci_lower": 0.5240619999999999,
+      "ci_upper": 0.637938,
+      "margin_of_error": 0.056937999999999996
+    },
+    "metadata_svm": {
+      "score": 0.5965,
+      "ci_lower": 0.538043,
+      "ci_upper": 0.654957,
+      "margin_of_error": 0.05845700000000001
+    },
+    "early_fusion_rf": {
+      "score": 0.6325,
+      "ci_lower": 0.570515,
+      "ci_upper": 0.6944849999999999,
+      "margin_of_error": 0.061985
+    },
+    "late_fusion_weighted": {
+      "score": 0.599,
+      "ci_lower": 0.540298,
+      "ci_upper": 0.657702,
+      "margin_of_error": 0.058702000000000004
+    },
+    "bagging_multimodal": {
+      "score": 0.6165,
+      "ci_lower": 0.556083,
+      "ci_upper": 0.6769170000000001,
+      "margin_of_error": 0.06041700000000001
+    },
+    "boosting_multimodal": {
+      "score": 0.6435,
+      "ci_lower": 0.580437,
+      "ci_upper": 0.7065629999999999,
+      "margin_of_error": 0.06306300000000001
+    },
+    "stacking_meta": {
+      "score": 0.6085,
+      "ci_lower": 0.548867,
+      "ci_upper": 0.6681330000000001,
+      "margin_of_error": 0.059633000000000005
+    },
+    "XGBoost + BERT-like Features": {
+      "score": 0.646,
+      "ci_lower": 0.582692,
+      "ci_upper": 0.709308,
+      "margin_of_error": 0.063308
+    },
+    "LightGBM + Multimodal": {
+      "score": 0.642,
+      "ci_lower": 0.579084,
+      "ci_upper": 0.704916,
+      "margin_of_error": 0.062916
+    },
+    "Advanced Ensemble (Voting)": {
+      "score": 0.6485,
+      "ci_lower": 0.584947,
+      "ci_upper": 0.7120529999999999,
+      "margin_of_error": 0.063553
+    }
+  }
+}

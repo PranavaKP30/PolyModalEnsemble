@@ -1,0 +1,13 @@
+{
+  "experiment_name": "amazon_reviews_quick_20250914_190302",
+  "test_mode": "quick",
+  "seeds": [
+    42
+  ],
+  "total_phases": 3,
+  "successful_phases": 2,
+  "success_rate": 66.66666666666666,
+  "duration_seconds": 3663.915516138077,
+  "duration_hours": 1.0177543100383546,
+  "timestamp": "2025-09-14T20:04:06.375324"
+}

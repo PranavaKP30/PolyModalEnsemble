@@ -75,6 +75,8 @@ class MultiModalEnsembleModel:
                  metadata_level='complete', pairing_focus='performance',
                  feature_ratio_weight=0.4, variance_weight=0.3, dimensionality_weight=0.3,
                  base_performance=0.6, diversity_bonus=0.1, weightage_bonus=0.1, dropout_penalty=0.1,
+                     # Learner Type Selection (NEW HYPERPARAMETER)
+                     learner_type='sklearn',  # 'sklearn', 'pytorch', 'deep_learning', or 'transformer' - choose base learner implementation
                  # Stage 4: Base Learner Training parameters
                  learning_rate=5e-4, weight_decay=1e-3, optimizer_type='adamw', scheduler_type='cosine_restarts',
                  gradient_accumulation_steps=1, gradient_clipping=1.0, early_stopping_patience=10,
@@ -96,6 +98,13 @@ class MultiModalEnsembleModel:
                  # Stage 1: Data Integration parameters
                  handle_nan='fill_mean', handle_inf='fill_max',
                  normalize=False, remove_outliers=False, outlier_std=3.0,
+                 # Advanced Stage 1 parameters
+                 scaler_type='robust', outlier_method='isolation_forest',
+                 reduce_text_features=True, reduction_method='random_projection',
+                 text_svd_components=200, feature_selection=False,
+                 selection_method='mutual_info', n_features_select=None,
+                 cross_modal_features=True, polynomial_features=True,
+                 polynomial_degree=2, parallel_processing=True,
                  verbose=True):
         
         # Core parameters
@@ -126,6 +135,7 @@ class MultiModalEnsembleModel:
         self.diversity_bonus = diversity_bonus
         self.weightage_bonus = weightage_bonus
         self.dropout_penalty = dropout_penalty
+        self.learner_type = learner_type
         
         # Stage 4: Base Learner Training parameters
         self.learning_rate = learning_rate
@@ -182,6 +192,20 @@ class MultiModalEnsembleModel:
         self.normalize = normalize
         self.remove_outliers = remove_outliers
         self.outlier_std = outlier_std
+        
+        # Advanced Stage 1 parameters
+        self.scaler_type = scaler_type
+        self.outlier_method = outlier_method
+        self.reduce_text_features = reduce_text_features
+        self.reduction_method = reduction_method
+        self.text_svd_components = text_svd_components
+        self.feature_selection = feature_selection
+        self.selection_method = selection_method
+        self.n_features_select = n_features_select
+        self.cross_modal_features = cross_modal_features
+        self.polynomial_features = polynomial_features
+        self.polynomial_degree = polynomial_degree
+        self.parallel_processing = parallel_processing
         
         # Internal state
         self.is_fitted_ = False
@@ -370,13 +394,25 @@ class MultiModalEnsembleModel:
     
     def _apply_data_preprocessing(self, data_loader):
         """Apply data preprocessing using Stage 1 capabilities."""
-        # Process data using Stage 1
+        # Process data using Stage 1 with advanced features
         data_loader.process_data(
             handle_nan=self.handle_nan,
             handle_inf=self.handle_inf,
             normalize=self.normalize,
+            scaler_type=getattr(self, 'scaler_type', 'robust'),  # Use advanced scaling
             remove_outliers=self.remove_outliers,
-            outlier_std=self.outlier_std
+            outlier_method=getattr(self, 'outlier_method', 'isolation_forest'),  # Use advanced outlier detection
+            outlier_std=self.outlier_std,
+            reduce_text_features=getattr(self, 'reduce_text_features', True),
+            reduction_method=getattr(self, 'reduction_method', 'random_projection'),  # Use Random Projection
+            text_svd_components=getattr(self, 'text_svd_components', 200),
+            feature_selection=getattr(self, 'feature_selection', False),
+            selection_method=getattr(self, 'selection_method', 'mutual_info'),
+            n_features_select=getattr(self, 'n_features_select', None),
+            cross_modal_features=getattr(self, 'cross_modal_features', True),  # Enable cross-modal features
+            polynomial_features=getattr(self, 'polynomial_features', True),  # Enable polynomial features
+            polynomial_degree=getattr(self, 'polynomial_degree', 2),
+            parallel_processing=getattr(self, 'parallel_processing', True)  # Enable parallel processing
         )
 
     def _generate_ensemble_bags(self):
@@ -422,7 +458,10 @@ class MultiModalEnsembleModel:
             print("Selecting base learners...")
         
         # Import Stage 3
-        from .baseLearnerSelector import BaseLearnerSelector
+        try:
+            from .baseLearnerSelector import BaseLearnerSelector
+        except ImportError:
+            from baseLearnerSelector import BaseLearnerSelector
         
         # Create learner selector
         self.learner_selector = BaseLearnerSelector(
@@ -443,7 +482,9 @@ class MultiModalEnsembleModel:
             base_performance=self.base_performance,
             diversity_bonus=self.diversity_bonus,
             weightage_bonus=self.weightage_bonus,
-            dropout_penalty=self.dropout_penalty
+            dropout_penalty=self.dropout_penalty,
+            # Learner type selection
+            learner_type=self.learner_type
         )
         
         # Get bag data from bagger
@@ -551,6 +592,42 @@ class MultiModalEnsembleModel:
             # Get the corresponding bag configuration
             bag_config = self.bag_learner_configs[i] if i < len(self.bag_learner_configs) else None
             
+            # Update bag characteristics to reflect actual features used by the learner
+            if bag_config is not None:
+                # Get the actual bag data used for training
+                actual_bag_data = self.bagger.get_bag_data(i)
+                
+                # Update feature masks to reflect actual dimensions used
+                updated_feature_mask = {}
+                for modality_name, data in actual_bag_data.items():
+                    if modality_name != 'labels' and isinstance(data, np.ndarray):
+                        # Create a mask that selects all features (since they're already sampled)
+                        updated_feature_mask[modality_name] = np.ones(data.shape[1], dtype=bool)
+                
+                # Store the original feature mask for reconstruction
+                original_feature_mask = bag_config.feature_mask
+                
+                # Create updated bag config with actual feature dimensions
+                from .baseLearnerSelector import BagLearnerConfig
+                updated_bag_config = BagLearnerConfig(
+                    bag_id=bag_config.bag_id,
+                    bag_data=actual_bag_data,
+                    bag_labels=actual_bag_data.get('labels', np.array([])),
+                    modality_mask=bag_config.modality_mask,
+                    feature_mask=updated_feature_mask,
+                    learner_type=bag_config.learner_type,
+                    learner_config=bag_config.learner_config,
+                    modality_weights=bag_config.modality_weights,
+                    optimization_mode=bag_config.optimization_mode,
+                    task_type=bag_config.task_type,
+                    expected_performance=bag_config.expected_performance,
+                    learner_instance=bag_config.learner_instance
+                )
+                
+                # Store the original feature mask for reconstruction
+                updated_bag_config.original_feature_mask = original_feature_mask
+                bag_config = updated_bag_config
+            
             # Prepare metrics for the learner
             metrics = {
                 'accuracy': trained_learner_info.final_performance,
@@ -567,6 +644,83 @@ class MultiModalEnsembleModel:
         if self.verbose:
             print(f"Ensemble predictor setup with {len(self.trained_learners)} learners")
     
+    def _preprocess_prediction_data(self, X):
+        """
+        Apply the same preprocessing to prediction data that was applied during training.
+        This uses the fitted transformers from the training data loader.
+        """
+        X_processed = {}
+        
+        # Use the fitted data loader from training
+        if not hasattr(self, 'data_loader'):
+            raise ValueError("Model must be fitted before making predictions")
+        
+        # Apply the same preprocessing transformations that were applied during training
+        for modality_name, data in X.items():
+            # Remove '_test' suffix for internal processing
+            clean_name = modality_name.replace('_test', '')
+            
+            # Apply dimensionality reduction if it was applied during training
+            if clean_name == 'text' and hasattr(self.data_loader, 'text_svd') and self.data_loader.text_svd is not None:
+                data = self.data_loader.text_svd.transform(data)
+            
+            # Apply scaling if it was applied during training
+            if self.normalize and clean_name in self.data_loader.scalers:
+                data = self.data_loader.scalers[clean_name].transform(data)
+            
+            # Store the processed data
+            X_processed[modality_name] = data
+        
+        # If cross-modal features were created during training, create them for prediction too
+        if self.cross_modal_features and len(X_processed) > 1:
+            # Get the base modalities (without _test suffix)
+            base_modalities = {}
+            for name, data in X_processed.items():
+                clean_name = name.replace('_test', '')
+                base_modalities[clean_name] = data
+            
+            # Create cross-modal features
+            modalities = list(base_modalities.keys())
+            for i, mod1 in enumerate(modalities):
+                for j, mod2 in enumerate(modalities[i+1:], i+1):
+                    # Handle different dimensions by taking minimum
+                    min_features = min(base_modalities[mod1].shape[1], base_modalities[mod2].shape[1])
+                    
+                    # Truncate to same dimensions
+                    mod1_trunc = base_modalities[mod1][:, :min_features]
+                    mod2_trunc = base_modalities[mod2][:, :min_features]
+                    
+                    # Element-wise multiplication
+                    interaction = mod1_trunc * mod2_trunc
+                    
+                    # Add to processed data
+                    interaction_name = f"{mod1}_{mod2}_interaction_test"
+                    X_processed[interaction_name] = interaction
+        
+        # If polynomial features were created during training, create them for prediction too
+        if self.polynomial_features:
+            from sklearn.preprocessing import PolynomialFeatures
+            
+            # Create a copy of the dictionary to avoid modification during iteration
+            original_modalities = dict(X_processed)
+            
+            # Apply polynomial features to each modality
+            for modality_name, data in original_modalities.items():
+                if not modality_name.endswith('_interaction_test'):
+                    # Limit features to avoid explosion (same as training)
+                    max_features = min(50, data.shape[1])
+                    data_subset = data[:, :max_features]
+                    
+                    # Create polynomial features
+                    poly = PolynomialFeatures(degree=self.polynomial_degree, include_bias=False, interaction_only=True)
+                    poly_features = poly.fit_transform(data_subset)
+                    
+                    # Add polynomial features
+                    poly_name = f"{modality_name.replace('_test', '')}_polynomial_test"
+                    X_processed[poly_name] = poly_features
+        
+        return X_processed
+    
     def predict(self, X):
         """
         Make predictions on new data using Stage 5 ensemble prediction.
@@ -580,8 +734,11 @@ class MultiModalEnsembleModel:
         if not self.is_fitted_:
             raise ValueError("Model must be fitted before making predictions")
         
+        # Apply the same preprocessing that was applied during training
+        X_processed = self._preprocess_prediction_data(X)
+        
         # Use Stage 5 ensemble predictor
-        result = self.ensemble_predictor.predict(X)
+        result = self.ensemble_predictor.predict(X_processed)
         return result
     
     def predict_proba(self, X):
@@ -603,10 +760,17 @@ class MultiModalEnsembleModel:
         # Use Stage 5 ensemble predictor
         result = self.ensemble_predictor.predict(X)
         
-        # Convert predictions to probabilities (simplified)
+        # Convert predictions to probabilities
         n_classes = len(np.unique(self.train_labels))
-        proba = np.zeros((len(result.predictions), n_classes))
-        proba[np.arange(len(result.predictions)), result.predictions] = 1.0
+        
+        if result.predictions.ndim == 1:
+            # Predictions are class indices, convert to probabilities
+            proba = np.zeros((len(result.predictions), n_classes))
+            pred_int = result.predictions.astype(int)
+            proba[np.arange(len(result.predictions)), pred_int] = 1.0
+        else:
+            # Predictions are already probabilities
+            proba = result.predictions
         
         return proba
     
@@ -696,7 +860,10 @@ class MultiModalEnsembleModel:
                 {'aggregation_strategy': 'transformer_fusion', 'name': 'Transformer_Fusion'}
             ]
         
-        from MainModel.ensemblePrediction import run_simple_ablation_test
+        try:
+            from .ensemblePrediction import run_simple_ablation_test
+        except ImportError:
+            from ensemblePrediction import run_simple_ablation_test
         return run_simple_ablation_test(self.ensemble_predictor, test_data, test_labels, ablation_configs)
     
     def run_exact_reconstruction_ablation(self, test_data: Dict[str, np.ndarray], 
@@ -731,6 +898,81 @@ class MultiModalEnsembleModel:
         """
         return self.run_stage5_ablation_study(test_data, test_labels, ablation_configs)
     
+    def run_bag_reconstruction_ablation(self, test_data: Dict[str, np.ndarray], 
+                                      test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Run ablation study for bag reconstruction novel feature.
+        
+        Args:
+            test_data: Test data dictionary with modalities
+            test_labels: True labels for evaluation
+            
+        Returns:
+            Dictionary with bag reconstruction ablation results
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running ablation studies")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running ablation studies")
+        
+        try:
+            from .ensemblePrediction import run_bag_reconstruction_ablation
+        except ImportError:
+            from ensemblePrediction import run_bag_reconstruction_ablation
+        
+        return run_bag_reconstruction_ablation(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_uncertainty_method_ablation(self, test_data: Dict[str, np.ndarray], 
+                                      test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Run ablation study for uncertainty method novel feature.
+        
+        Args:
+            test_data: Test data dictionary with modalities
+            test_labels: True labels for evaluation
+            
+        Returns:
+            Dictionary with uncertainty method ablation results
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running ablation studies")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running ablation studies")
+        
+        try:
+            from .ensemblePrediction import run_uncertainty_method_ablation
+        except ImportError:
+            from ensemblePrediction import run_uncertainty_method_ablation
+        
+        return run_uncertainty_method_ablation(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_transformer_architecture_ablation(self, test_data: Dict[str, np.ndarray], 
+                                            test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Run ablation study for transformer architecture (modality-aware aggregation).
+        
+        Args:
+            test_data: Test data dictionary with modalities
+            test_labels: True labels for evaluation
+            
+        Returns:
+            Dictionary with transformer architecture ablation results
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running ablation studies")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running ablation studies")
+        
+        try:
+            from .ensemblePrediction import run_transformer_architecture_ablation
+        except ImportError:
+            from ensemblePrediction import run_transformer_architecture_ablation
+        
+        return run_transformer_architecture_ablation(self.ensemble_predictor, test_data, test_labels)
+    
 
     def fit(self, X, y, sample_weight=None):
         """
@@ -762,9 +1004,16 @@ class MultiModalEnsembleModel:
         if self.verbose:
             print("Stage 1: Data Integration")
         
-        data_loader = self._prepare_data_loader(X, y, is_pre_split)
-        self._load_and_integrate_data(data_loader)
-        self._apply_data_preprocessing(data_loader)
+        self.data_loader = self._prepare_data_loader(X, y, is_pre_split)
+        print(f"DEBUG Stage 1.1: Data loader prepared, is_pre_split={is_pre_split}")
+        
+        self._load_and_integrate_data(self.data_loader)
+        print(f"DEBUG Stage 1.2: Data loaded and integrated")
+        print(f"DEBUG Stage 1.2: Train data keys: {list(self.train_data.keys()) if hasattr(self, 'train_data') else 'None'}")
+        print(f"DEBUG Stage 1.2: Test data keys: {list(self.test_data.keys()) if hasattr(self, 'test_data') else 'None'}")
+        
+        self._apply_data_preprocessing(self.data_loader)
+        print(f"DEBUG Stage 1.3: Data preprocessing applied")
         
         # Determine task type
         y_combined = np.concatenate([self.train_labels, self.test_labels])
@@ -1024,6 +1273,130 @@ class MultiModalEnsembleModel:
         if not self.is_fitted_:
             raise ValueError("Model must be fitted before getting ensemble statistics")
         return self.bagger.get_ensemble_statistics()
+
+    # Stage 2 Robustness Test Methods
+
+    def test_dropout_strategy_robustness(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Test robustness of different dropout strategies."""
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        results = {}
+        
+        for scenario_name, scenario_config in test_scenarios.items():
+            try:
+                # Create test model with different dropout strategy
+                test_model = MultiModalEnsembleModel(
+                    n_bags=self.n_bags,
+                    dropout_strategy=scenario_config.get('dropout_strategy', 'adaptive'),
+                    optimization_mode=self.optimization_mode,
+                    modality_aware=self.modality_aware,
+                    bag_learner_pairing=self.bag_learner_pairing,
+                    random_state=self.random_state,
+                    verbose=False
+                )
+                
+                test_model.fit(self.train_data, self.train_labels)
+                
+                # Get ensemble statistics
+                ensemble_stats = test_model.get_ensemble_statistics()
+                modality_importance = test_model.get_modality_importance()
+                feature_stats = test_model.get_feature_statistics()
+                
+                # Calculate robustness score
+                robustness_score = np.mean([
+                    ensemble_stats.get('mean_dropout_rate', 0.5),  # Normalize dropout rate
+                    1.0 - ensemble_stats.get('std_dropout_rate', 0.5),  # Lower std = more robust
+                    len(modality_importance) / len(self.modality_configs_) if modality_importance else 0,  # Modality coverage
+                ])
+                
+                results[scenario_name] = {
+                    'scenario_config': scenario_config,
+                    'ensemble_statistics': ensemble_stats,
+                    'modality_importance': modality_importance,
+                    'feature_statistics': feature_stats,
+                    'robustness_score': robustness_score,
+                    'success': True
+                }
+                
+            except Exception as e:
+                results[scenario_name] = {
+                    'scenario_config': scenario_config,
+                    'error': str(e),
+                    'success': False
+                }
+        
+        return results
+
+    def test_ensemble_size_robustness(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Test robustness across different ensemble sizes."""
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        results = {}
+        
+        for scenario_name, scenario_config in test_scenarios.items():
+            try:
+                # Create test model with different ensemble size
+                test_model = MultiModalEnsembleModel(
+                    n_bags=scenario_config.get('n_bags', self.n_bags),
+                    dropout_strategy=self.dropout_strategy,
+                    optimization_mode=self.optimization_mode,
+                    modality_aware=self.modality_aware,
+                    bag_learner_pairing=self.bag_learner_pairing,
+                    random_state=self.random_state,
+                    verbose=False
+                )
+                
+                test_model.fit(self.train_data, self.train_labels)
+                
+                # Get ensemble statistics
+                ensemble_stats = test_model.get_ensemble_statistics()
+                modality_importance = test_model.get_modality_importance()
+                feature_stats = test_model.get_feature_statistics()
+                
+                # Calculate size efficiency
+                n_bags = scenario_config.get('n_bags', self.n_bags)
+                size_efficiency = ensemble_stats.get('total_bags', 0) / n_bags if n_bags > 0 else 0
+                
+                # Calculate robustness score
+                robustness_score = np.mean([
+                    size_efficiency,
+                    ensemble_stats.get('mean_dropout_rate', 0.5),
+                    1.0 - ensemble_stats.get('std_dropout_rate', 0.5),
+                    len(modality_importance) / len(self.modality_configs_) if modality_importance else 0,
+                ])
+                
+                results[scenario_name] = {
+                    'scenario_config': scenario_config,
+                    'ensemble_statistics': ensemble_stats,
+                    'modality_importance': modality_importance,
+                    'feature_statistics': feature_stats,
+                    'size_efficiency': size_efficiency,
+                    'robustness_score': robustness_score,
+                    'success': True
+                }
+                
+            except Exception as e:
+                results[scenario_name] = {
+                    'scenario_config': scenario_config,
+                    'error': str(e),
+                    'success': False
+                }
+        
+        return results
+
+    def run_stage2_robustness_test(self, test_type: str, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Run specific Stage 2 robustness tests."""
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        if test_type == 'dropout_strategy':
+            return self.test_dropout_strategy_robustness(test_scenarios)
+        elif test_type == 'ensemble_size':
+            return self.test_ensemble_size_robustness(test_scenarios)
+        else:
+            raise ValueError(f"Unknown Stage 2 robustness test type: {test_type}")
 
     # Stage 3 API Methods
 
@@ -1467,6 +1840,136 @@ class MultiModalEnsembleModel:
         
         return results
 
+    def test_optimization_mode_robustness(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Test robustness of optimization mode selection."""
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        # Add bag data and bags to test scenarios
+        bag_data = None
+        bags = None
+        if hasattr(self, 'bagger') and self.bagger and hasattr(self.bagger, 'bag_data'):
+            bag_data = list(self.bagger.bag_data.values())
+        elif hasattr(self, 'bag_data') and self.bag_data:
+            bag_data = self.bag_data
+        
+        if hasattr(self, 'bags') and self.bags:
+            bags = self.bags
+        
+        enhanced_scenarios = {}
+        for scenario_name, scenario_config in test_scenarios.items():
+            enhanced_scenarios[scenario_name] = scenario_config.copy()
+            if bag_data:
+                enhanced_scenarios[scenario_name]['bag_data'] = bag_data
+            if bags:
+                enhanced_scenarios[scenario_name]['bags'] = bags
+        
+        return self.learner_selector.test_optimization_mode_robustness(enhanced_scenarios)
+
+    def test_modality_weightage_robustness(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Test robustness of modality weightage parameters."""
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        # Add bag data and bags to test scenarios
+        bag_data = None
+        bags = None
+        if hasattr(self, 'bagger') and self.bagger and hasattr(self.bagger, 'bag_data'):
+            bag_data = list(self.bagger.bag_data.values())
+        elif hasattr(self, 'bag_data') and self.bag_data:
+            bag_data = self.bag_data
+        
+        if hasattr(self, 'bags') and self.bags:
+            bags = self.bags
+        
+        enhanced_scenarios = {}
+        for scenario_name, scenario_config in test_scenarios.items():
+            enhanced_scenarios[scenario_name] = scenario_config.copy()
+            if bag_data:
+                enhanced_scenarios[scenario_name]['bag_data'] = bag_data
+            if bags:
+                enhanced_scenarios[scenario_name]['bags'] = bags
+        
+        return self.learner_selector.test_modality_weightage_robustness(enhanced_scenarios)
+
+    def test_bag_learner_pairing_robustness(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Test robustness of bag-learner pairing strategies."""
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        # Add bag data and bags to test scenarios
+        bag_data = None
+        bags = None
+        if hasattr(self, 'bagger') and self.bagger and hasattr(self.bagger, 'bag_data'):
+            bag_data = list(self.bagger.bag_data.values())
+        elif hasattr(self, 'bag_data') and self.bag_data:
+            bag_data = self.bag_data
+        
+        if hasattr(self, 'bags') and self.bags:
+            bags = self.bags
+        
+        enhanced_scenarios = {}
+        for scenario_name, scenario_config in test_scenarios.items():
+            enhanced_scenarios[scenario_name] = scenario_config.copy()
+            if bag_data:
+                enhanced_scenarios[scenario_name]['bag_data'] = bag_data
+            if bags:
+                enhanced_scenarios[scenario_name]['bags'] = bags
+        
+        return self.learner_selector.test_bag_learner_pairing_robustness(enhanced_scenarios)
+
+    def test_performance_prediction_robustness(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Test robustness of performance prediction system."""
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        # Add bag data and bags to test scenarios
+        bag_data = None
+        bags = None
+        if hasattr(self, 'bagger') and self.bagger and hasattr(self.bagger, 'bag_data'):
+            bag_data = list(self.bagger.bag_data.values())
+        elif hasattr(self, 'bag_data') and self.bag_data:
+            bag_data = self.bag_data
+        
+        if hasattr(self, 'bags') and self.bags:
+            bags = self.bags
+        
+        enhanced_scenarios = {}
+        for scenario_name, scenario_config in test_scenarios.items():
+            enhanced_scenarios[scenario_name] = scenario_config.copy()
+            if bag_data:
+                enhanced_scenarios[scenario_name]['bag_data'] = bag_data
+            if bags:
+                enhanced_scenarios[scenario_name]['bags'] = bags
+        
+        return self.learner_selector.test_performance_prediction_robustness(enhanced_scenarios)
+
+    def test_ensemble_size_robustness(self, test_scenarios: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Test robustness across different ensemble sizes."""
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        # Add bag data and bags to test scenarios
+        bag_data = None
+        bags = None
+        if hasattr(self, 'bagger') and self.bagger and hasattr(self.bagger, 'bag_data'):
+            bag_data = list(self.bagger.bag_data.values())
+        elif hasattr(self, 'bag_data') and self.bag_data:
+            bag_data = self.bag_data
+        
+        if hasattr(self, 'bags') and self.bags:
+            bags = self.bags
+        
+        enhanced_scenarios = {}
+        for scenario_name, scenario_config in test_scenarios.items():
+            enhanced_scenarios[scenario_name] = scenario_config.copy()
+            if bag_data:
+                enhanced_scenarios[scenario_name]['bag_data'] = bag_data
+            if bags:
+                enhanced_scenarios[scenario_name]['bags'] = bags
+        
+        return self.learner_selector.test_ensemble_size_robustness(enhanced_scenarios)
+
 
     # Stage 3 Interpretability Test Convenience Methods
 
@@ -1741,7 +2244,10 @@ class MultiModalEnsembleModel:
         if self.ensemble_predictor is None:
             raise ValueError("Ensemble predictor must be set up before running interpretability tests")
         
-        from MainModel.ensemblePrediction import run_simple_interpretability_test
+        try:
+            from .ensemblePrediction import run_simple_interpretability_test
+        except ImportError:
+            from ensemblePrediction import run_simple_interpretability_test
         return run_simple_interpretability_test(self.ensemble_predictor, test_data, test_labels)
     
     def analyze_integrated_stage5_interpretability(self, test_data: Dict[str, np.ndarray], 
@@ -1764,6 +2270,101 @@ class MultiModalEnsembleModel:
         Analyze interpretability of modality importance
         """
         return self.run_stage5_interpretability_test(test_data, test_labels, 'modality_importance')
+    
+    def run_ensemble_aggregation_interpretability_test(self, test_data: Dict[str, np.ndarray], 
+                                                     test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Interpretability Test 1: Ensemble Aggregation Interpretability Analysis
+        Analyzes how the ensemble aggregation system makes decisions and combines predictions
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running interpretability tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running interpretability tests")
+        
+        try:
+            from .ensemblePrediction import run_ensemble_aggregation_interpretability_test
+        except ImportError:
+            from ensemblePrediction import run_ensemble_aggregation_interpretability_test
+        
+        return run_ensemble_aggregation_interpretability_test(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_modality_importance_interpretability_test(self, test_data: Dict[str, np.ndarray], 
+                                                    test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Interpretability Test 2: Modality Importance Granularity Analysis
+        Analyzes how different modalities contribute to ensemble decisions
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running interpretability tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running interpretability tests")
+        
+        try:
+            from .ensemblePrediction import run_modality_importance_interpretability_test
+        except ImportError:
+            from ensemblePrediction import run_modality_importance_interpretability_test
+        
+        return run_modality_importance_interpretability_test(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_uncertainty_calibration_interpretability_test(self, test_data: Dict[str, np.ndarray], 
+                                                        test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Interpretability Test 3: Uncertainty Calibration Analysis
+        Analyzes how well the uncertainty estimates correlate with actual prediction errors
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running interpretability tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running interpretability tests")
+        
+        try:
+            from .ensemblePrediction import run_uncertainty_calibration_interpretability_test
+        except ImportError:
+            from ensemblePrediction import run_uncertainty_calibration_interpretability_test
+        
+        return run_uncertainty_calibration_interpretability_test(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_attention_pattern_interpretability_test(self, test_data: Dict[str, np.ndarray], 
+                                                  test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Interpretability Test 4: Attention Pattern Analysis
+        Analyzes attention patterns in transformer-based aggregation
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running interpretability tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running interpretability tests")
+        
+        try:
+            from .ensemblePrediction import run_attention_pattern_interpretability_test
+        except ImportError:
+            from ensemblePrediction import run_attention_pattern_interpretability_test
+        
+        return run_attention_pattern_interpretability_test(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_bag_reconstruction_fidelity_interpretability_test(self, test_data: Dict[str, np.ndarray], 
+                                                            test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Interpretability Test 5: Bag Reconstruction Fidelity Analysis
+        Analyzes how faithfully the bag reconstruction process preserves training bag characteristics
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running interpretability tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running interpretability tests")
+        
+        try:
+            from .ensemblePrediction import run_bag_reconstruction_fidelity_interpretability_test
+        except ImportError:
+            from ensemblePrediction import run_bag_reconstruction_fidelity_interpretability_test
+        
+        return run_bag_reconstruction_fidelity_interpretability_test(self.ensemble_predictor, test_data, test_labels)
 
     # --- Stage 5 Robustness Test Methods ---
     
@@ -1778,7 +2379,10 @@ class MultiModalEnsembleModel:
         if self.ensemble_predictor is None:
             raise ValueError("Ensemble predictor must be set up before running robustness tests")
         
-        from MainModel.ensemblePrediction import run_simple_robustness_test
+        try:
+            from .ensemblePrediction import run_simple_robustness_test
+        except ImportError:
+            from ensemblePrediction import run_simple_robustness_test
         return run_simple_robustness_test(self.ensemble_predictor, test_data, test_labels)
     
     def test_exact_reconstruction_robustness(self, test_data: Dict[str, np.ndarray], 
@@ -1794,3 +2398,98 @@ class MultiModalEnsembleModel:
         Test robustness of integrated Stage 5 features working together
         """
         return self.run_stage5_robustness_test(test_data, test_labels)
+    
+    def run_bag_reconstruction_robustness_test(self, test_data: Dict[str, np.ndarray], 
+                                             test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Robustness Test 1: Bag Reconstruction Robustness
+        Tests robustness of bag reconstruction system under various conditions
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running robustness tests")
+        
+        try:
+            from .ensemblePrediction import run_bag_reconstruction_robustness_test
+        except ImportError:
+            from ensemblePrediction import run_bag_reconstruction_robustness_test
+        
+        return run_bag_reconstruction_robustness_test(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_uncertainty_method_robustness_test(self, test_data: Dict[str, np.ndarray], 
+                                             test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Robustness Test 2: Uncertainty Method Robustness
+        Tests robustness of different uncertainty quantification methods under stress
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running robustness tests")
+        
+        try:
+            from .ensemblePrediction import run_uncertainty_method_robustness_test
+        except ImportError:
+            from ensemblePrediction import run_uncertainty_method_robustness_test
+        
+        return run_uncertainty_method_robustness_test(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_transformer_architecture_robustness_test(self, test_data: Dict[str, np.ndarray], 
+                                                   test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Robustness Test 3: Transformer Architecture Robustness
+        Tests robustness of different transformer architectures under various conditions
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running robustness tests")
+        
+        try:
+            from .ensemblePrediction import run_transformer_architecture_robustness_test
+        except ImportError:
+            from ensemblePrediction import run_transformer_architecture_robustness_test
+        
+        return run_transformer_architecture_robustness_test(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_ensemble_aggregation_robustness_test(self, test_data: Dict[str, np.ndarray], 
+                                               test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Robustness Test 4: Ensemble Aggregation Robustness
+        Tests robustness of different aggregation strategies under stress
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running robustness tests")
+        
+        try:
+            from .ensemblePrediction import run_ensemble_aggregation_robustness_test
+        except ImportError:
+            from ensemblePrediction import run_ensemble_aggregation_robustness_test
+        
+        return run_ensemble_aggregation_robustness_test(self.ensemble_predictor, test_data, test_labels)
+    
+    def run_integrated_stage5_robustness_test(self, test_data: Dict[str, np.ndarray], 
+                                            test_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """
+        Stage 5 Robustness Test 5: Integrated Stage 5 Robustness
+        Tests robustness of integrated Stage 5 features working together
+        """
+        if not self.is_fitted_:
+            raise ValueError("Model must be fitted before running robustness tests")
+        
+        if self.ensemble_predictor is None:
+            raise ValueError("Ensemble predictor must be set up before running robustness tests")
+        
+        try:
+            from .ensemblePrediction import run_integrated_stage5_robustness_test
+        except ImportError:
+            from ensemblePrediction import run_integrated_stage5_robustness_test
+        
+        return run_integrated_stage5_robustness_test(self.ensemble_predictor, test_data, test_labels)

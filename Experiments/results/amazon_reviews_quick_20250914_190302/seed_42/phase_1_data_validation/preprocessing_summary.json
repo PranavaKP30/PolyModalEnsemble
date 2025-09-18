@@ -1,0 +1,32 @@
+{
+  "preprocessing_steps": [
+    "normalize_data",
+    "remove_outliers_std_3.0"
+  ],
+  "preprocessing_time": 7.43541407585144,
+  "memory_usage_before": {
+    "train_text": 61.096317291259766,
+    "train_metadata": 0.9156532287597656,
+    "test_text": 15.274173736572266,
+    "test_metadata": 0.22900772094726562
+  },
+  "memory_usage_after": {
+    "train_text": 61.096317291259766,
+    "train_metadata": 0.9156532287597656,
+    "test_text": 15.274173736572266,
+    "test_metadata": 0.22900772094726562
+  },
+  "preprocessing_config": {
+    "handle_nan": null,
+    "handle_inf": null,
+    "normalize_data": [
+      true,
+      false
+    ],
+    "remove_outliers": [
+      true,
+      false
+    ],
+    "outlier_std": 3.0
+  }
+}

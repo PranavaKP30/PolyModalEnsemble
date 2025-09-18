@@ -1,0 +1,31 @@
+[
+  {
+    "number": 0,
+    "value": 0.2,
+    "state": "1",
+    "params": {
+      "n_bags": 20,
+      "max_dropout_rate": 0.4,
+      "sample_ratio": 0.9,
+      "optimization_mode": "accuracy",
+      "learning_rate": 0.0001,
+      "epochs": 100,
+      "denoising_weight": 0.15,
+      "batch_size": 64,
+      "weight_decay": 0.001,
+      "early_stopping_patience": 15,
+      "label_smoothing": 0.1,
+      "transformer_num_heads": 8,
+      "transformer_hidden_dim": 256,
+      "uncertainty_method": "variance"
+    },
+    "user_attrs": {
+      "accuracy": 0.084,
+      "balanced_accuracy": 0.2,
+      "weighted_f1": 0.013018450184501847,
+      "weighted_precision": 0.007056,
+      "weighted_recall": 0.084
+    },
+    "system_attrs": {}
+  }
+]
