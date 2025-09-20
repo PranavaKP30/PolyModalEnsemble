@@ -7,28 +7,36 @@ Download Link
     Access: Free download from Kaggle, no registration barriers
 
 Modalities Present
-    Multispectral Imagery: Sentinel-2 satellite images (13 spectral bands)
-    Categorical Labels: Single-label land cover classifications
-    Geospatial Metadata: Geographic coordinates and regional information
-    Visual Data: Both RGB and full spectral versions available
+    Visual RGB: Red, Green, Blue bands (B04, B03, B02) for standard color imagery
+    Near-Infrared: NIR bands (B08, B8A) for vegetation and water analysis
+    Red-Edge: Red-edge bands (B05, B06, B07) for vegetation health assessment
+    Short-Wave Infrared: SWIR bands (B11, B12) for soil and mineral analysis
+    Atmospheric: Coastal aerosol (B01), water vapor (B09), cirrus (B10) for atmospheric correction
 
 Features Present
-    Image Features:
-        Spatial Resolution: 10m per pixel
-        Image Size: 64×64 pixels (640m × 640m area)
-        Spectral Bands: 13 bands total
-            RGB bands (B04-Red, B03-Green, B02-Blue)
-            Near-infrared bands (B08, B8A)
-            Red-edge bands (B05, B06, B07)
-            Short-wave infrared bands (B11, B12)
-            Coastal aerosol (B01)
-            Water vapor (B09)
-            Cirrus (B10)
-    Metadata Features:
-        Geographic coordinates (latitude/longitude)
-        European coverage (10 countries)
-        Acquisition timestamps
-        Quality indicators
+    Visual RGB Features:
+        Red Band (B04): 10m resolution, captures red light reflectance
+        Green Band (B03): 10m resolution, captures green light reflectance  
+        Blue Band (B02): 10m resolution, captures blue light reflectance
+        Spatial Resolution: 10m per pixel, Image Size: 64×64 pixels
+    Near-Infrared Features:
+        NIR Band (B08): 10m resolution, vegetation and water analysis
+        NIR Band (B8A): 20m resolution, enhanced vegetation analysis
+    Red-Edge Features:
+        Red-Edge 1 (B05): 20m resolution, vegetation health indicators
+        Red-Edge 2 (B06): 20m resolution, chlorophyll content analysis
+        Red-Edge 3 (B07): 20m resolution, leaf area index estimation
+    Short-Wave Infrared Features:
+        SWIR 1 (B11): 20m resolution, soil moisture and mineral analysis
+        SWIR 2 (B12): 20m resolution, geological and soil composition
+    Atmospheric Features:
+        Coastal Aerosol (B01): 60m resolution, atmospheric correction
+        Water Vapor (B09): 60m resolution, atmospheric water content
+        Cirrus (B10): 60m resolution, cloud detection and correction
+    Label Features:
+        Class names and numerical IDs (0-9)
+        Balanced distribution across 10 land cover classes
+        Single-label classification format
 
 Labels Present
     Single-label Classification with 10 distinct land cover classes:
@@ -48,8 +56,9 @@ Labels Present
 Goal/Purpose of the Task
     Primary Objectives:
         Land Cover Classification: Classify satellite image patches into one of 10 land cover categories
-        Multispectral Analysis: Compare performance using RGB vs full 13-band spectral information
-        Remote Sensing Benchmark: Provide accessible benchmark for satellite image classification research
+        Multimodal Fusion: Combine information from different spectral modalities (RGB, NIR, SWIR, etc.)
+        Spectral Band Analysis: Compare performance using different spectral band combinations
+        Remote Sensing Benchmark: Provide accessible benchmark for multispectral satellite image classification research
     Research Applications:
         Land use and land cover mapping
         Environmental monitoring and assessment
@@ -58,16 +67,107 @@ Goal/Purpose of the Task
         Comparative analysis of spectral band importance
         Transfer learning for larger satellite datasets
     Dataset Scale:
-        27,000 total images (2,700 per class)
-        10 balanced classes with equal representation
+        27,597 total images across 10 classes
+        Class distribution: AnnualCrop (3,000), Forest (3,000), HerbaceousVegetation (3,000), Highway (2,500), Industrial (2,500), Pasture (2,000), PermanentCrop (2,500), Residential (3,000), River (2,500), SeaLake (3,597)
+        Dataset splits: Train (19,317), Validation (5,519), Test (2,759)
         File size: ~2GB for full dataset
-        Coverage: 34 European countries
+        Coverage: European satellite imagery
         Time period: 2017-2018 Sentinel-2 imagery
         Benchmark accuracy: 98.57% achieved with deep learning models
 
 This dataset is particularly valuable as an accessible entry point for satellite image classification research, offering the same Sentinel-2 multispectral data as larger datasets but in a manageable size perfect for experimentation and learning multimodal remote sensing approaches.RetryClaude can make mistakes. Please double-check responses.
 
-Dataset 2: OASIS Alzheimer's Clinical Data
+Dataset 2: MUTLA Multimodal Teaching and Learning Analytics Dataset
+
+Download Link
+    Official Source: https://github.com/RyH9/SAILData/tree/main
+    Research Paper: https://www.researchgate.net/publication/336550673_MUTLA_A_Large-Scale_Dataset_for_Multimodal_Teaching_and_Learning_Analytics
+    Direct Download: Free download from GitHub repository
+    Access: Public dataset, no registration required
+
+Modalities Present
+    Behavioral: Student interaction logs and learning analytics from Squirrel AI Learning system
+    Physiological: Brainwave data from BrainCo EEG headsets (attention, raw EEG, device events)
+    Visual: Webcam video features extracted by SRI International (facial landmarks, eye tracking, head pose)
+    Temporal: Synchronized timestamps across all modalities for cross-modal alignment
+
+Features Present
+    Behavioral Features (User Records):
+        Learning Analytics: Question-level student responses, correctness, response times
+        Academic Structure: Course, section, topic, module, and knowledge point identifiers
+        Learning Behavior: Hint usage, answer viewing, analysis viewing patterns
+        Performance Metrics: Difficulty ratings, mastery tracking, proficiency estimates
+        Subject Coverage: Mathematics, English, Physics, Chemistry, Chinese, English Reading
+    Physiological Features (Brainwave Data):
+        Attention Values: Derived attention scores (0-100) from BrainCo headset
+        Raw EEG Data: Electrical potential differences with 160 data points per minute
+        Frequency Bands: Alpha (8-12Hz), LowBeta (12-22Hz), HighBeta (22-32Hz), Gamma (32-56Hz)
+        Device Events: Connection status and device state information
+        Temporal Resolution: Second-by-second brainwave measurements
+    Visual Features (Webcam Data):
+        Facial Landmarks: 51-point facial landmark detection and tracking
+        Eye Tracking: Pupil segmentation, iris landmarks (9 points per eye)
+        Head Pose: 3D rotation angles and translation vectors
+        Face Detection: Bounding box coordinates and confidence scores
+        Gaze Analysis: Eye movement patterns and attention direction
+    Synchronization Features:
+        Cross-Modal Alignment: Timestamp-based synchronization across all modalities
+        Question-Level Mapping: Behavioral data linked to physiological and visual data
+        Session Tracking: Multi-session learning progression over time
+
+Labels Present
+    Multi-class Classification with academic performance categories:
+    Primary Labels:
+        Correctness: Binary classification (correct/incorrect) for each question response
+        Performance Level: Continuous performance metrics based on response accuracy
+        Learning Mastery: Knowledge point mastery status (learned/not learned)
+        Attention State: Attention level classification (high/medium/low) from brainwave data
+        Engagement Level: Visual engagement indicators from webcam features
+    Behavioral Labels:
+        Response Time: Continuous variable (1-16899 seconds)
+        Difficulty Rating: Ordinal scale (1-9, easiest to hardest)
+        Hint Usage: Binary indicators for answer viewing and analysis viewing
+        Learning Progress: Module completion and knowledge point mastery
+    Physiological Labels:
+        Attention Score: Continuous variable (0-100) from BrainCo headset
+        EEG Frequency Bands: Alpha, Beta, Gamma wave energy levels
+        Device Connectivity: Binary status (connected/disconnected)
+    Visual Labels:
+        Facial Expression: Landmark-based emotion and engagement indicators
+        Eye Movement: Gaze direction and pupil tracking data
+        Head Orientation: 3D pose estimation for attention direction
+
+Goal/Purpose of the Task
+    Primary Objectives:
+        Learning Analytics: Predict student performance and learning outcomes from multimodal data
+        Attention Modeling: Correlate physiological attention with visual attention and learning success
+        Engagement Detection: Identify student engagement patterns across different learning activities
+        Adaptive Learning: Develop personalized learning recommendations based on multimodal signals
+        Educational AI: Enhance intelligent tutoring systems with physiological and visual feedback
+    Research Applications:
+        Multimodal learning analytics and educational data mining
+        Attention and engagement modeling in educational contexts
+        Physiological computing for adaptive learning systems
+        Computer vision applications in educational technology
+        Cross-modal learning and fusion techniques
+        Personalized learning and intelligent tutoring systems
+
+Dataset Scale:
+        Total Behavioral Samples: 30,002 question responses across 6 subjects
+        Total Synced Samples: 28,595 samples with cross-modal alignment
+        Core Multimodal Dataset: 738 samples with all 3 modalities (Behavioral + Physiological + Visual)
+        Robustness Dataset: 28,593 samples with missing modalities (Behavioral + Physiological OR Behavioral + Visual)
+        Subject Distribution: Math (8,272), English (14,977), Physics (3,781), Chemistry (1,310), Chinese (1,567), English Reading (95)
+        Physiological Data: 2,981 brainwave samples (9.9% coverage)
+        Visual Data: 3,612 video samples (12.0% coverage)
+        Students: 324 unique students across 2 learning centers
+        Time Period: November-December 2018 (2-month data collection)
+        File Size: ~2GB total (brainwave data available separately)
+        Quality: Research-grade educational data with realistic cross-modal coverage
+
+This dataset is particularly valuable for developing robust multimodal machine learning approaches in educational technology. The core multimodal dataset (738 samples) enables true multimodal fusion learning, while the robustness dataset (28,593 samples) provides realistic testing scenarios for missing modality handling - a common challenge in real-world educational applications where sensors may fail or data collection may be incomplete.
+
+Dataset 3: OASIS Alzheimer's Clinical Data
 
 Download Link
     Official Source: https://www.kaggle.com/datasets/jboysen/mri-and-alzheimers
@@ -76,30 +176,28 @@ Download Link
     Access: Public dataset, no registration required
 
 Modalities Present
-    Clinical: Cognitive assessment scores and dementia severity ratings
-    Demographic: Age, gender, education level, socioeconomic status
-    Longitudinal: Multiple visits per subject over time (longitudinal data)
-    Tabular: Structured clinical and demographic data in CSV format
+    SINGLE TABULAR MODALITY with multiple feature categories:
+    Note: This is NOT a multimodal dataset. All data is tabular (structured rows/columns) with different feature types within the same modality.
 
-Features Present
-    Clinical Features:
+Features Present (All within Single Tabular Modality)
+    Clinical Feature Category:
         Mini-Mental State Examination (MMSE): Cognitive screening scores (0-30 scale)
         Clinical Dementia Rating (CDR): Disease severity scale (0, 0.5, 1, 2)
         Diagnostic Categories: Normal, Very Mild Dementia, Mild Dementia, Moderate Dementia
         Visit Information: Visit numbers and assessment dates
-    Demographic Features:
+    Demographic Feature Category:
         Age: Age at time of assessment
         Gender: Male/Female distribution
         Education Level: Years of formal education
         Hand Preference: Right/Left handedness
         Socioeconomic Status: Socioeconomic indicators where available
-    Longitudinal Features:
+    Temporal Feature Category:
         Cross-sectional Data: Single visit per subject assessments
         Longitudinal Data: Multiple visits per subject over time
         Temporal Progression: Disease progression tracking
         Visit Intervals: Time between assessment sessions
         Subject Tracking: Unique identifiers across visits
-    Derived Features:
+    Brain Volume Feature Category:
         Estimated Total Intracranial Volume (eTIV): Brain volume estimates
         Normalized Whole Brain Volume (nWBV): Adjusted brain volume measures
         Atlas Scaling Factor (ASF): Volumetric scaling parameters
@@ -120,20 +218,21 @@ Labels Present
 
 Goal/Purpose of the Task
     Primary Objectives:
-        Clinical Dementia Prediction: Predict dementia severity from clinical and demographic features
+        Clinical Dementia Prediction: Predict dementia severity from clinical and demographic features using tabular data
         Early Detection: Identify subtle cognitive decline patterns before clinical diagnosis
         Longitudinal Analysis: Track disease progression over time using repeated measurements
     Research Applications:
-        Early screening and risk assessment for dementia
+        Early screening and risk assessment for dementia using clinical features
         Clinical decision support for healthcare providers
         Population-based dementia prevalence studies
         Longitudinal modeling of cognitive decline
         Feature importance analysis for clinical biomarkers
         Development of simplified screening tools
+    Note: This is a TABULAR CLASSIFICATION task, not multimodal learning
 
 Dataset Scale:
-    Cross-sectional: ~416 subjects with single assessments
-    Longitudinal: ~150 subjects with multiple visits over time
+    Cross-sectional: 436 subjects with single assessments (437 rows including header)
+    Longitudinal: 373 visits from 150 subjects with multiple visits over time (374 rows including header)
     Age range: 60-96 years for most subjects
     File format: Two CSV files (cross-sectional and longitudinal)
     File size: Small (~1-2 MB total)
@@ -142,82 +241,3 @@ Dataset Scale:
 
 This dataset is particularly valuable for developing traditional machine learning approaches for dementia classification using clinical and demographic features, and serves as an excellent benchmark for tabular data classification in healthcare applications.
 
-Dataset 3: Open University Learning Analytics Dataset (OULAD)
-
-Download Link
-    Official Source: https://www.kaggle.com/datasets/anlgrbz/student-demographics-online-education-dataoulad
-    Alternative: https://www.kaggle.com/datasets/rocki37/open-university-learning-analytics-dataset
-    Direct Download: Free download from Kaggle
-    Access: Public dataset, no registration required
-
-Modalities Present
-    Behavioral: Student interaction logs with Virtual Learning Environment (VLE)
-    Temporal: Clickstream data, learning activity sequences, engagement patterns
-    Educational: Course content, assessments, assignment submissions
-    Demographic: Student demographics, registration information, previous education
-
-Features Present
-    Behavioral Features:
-        VLE Interactions: virtual learning environments (VLE) clickstreams BIFOLD-BigEarthNetv2-0 (BIFOLD BigEarthNet v2.0)
-        Activity Types: Resource access, forum participation, assignment submissions
-        Engagement Patterns: Click frequencies, session durations, navigation behavior
-        Learning Pathways: Sequence of learning activities and resources accessed
-        Interaction Timing: Time spent on different learning materials
-
-    Temporal Features:
-        Activity Timestamps: When students accessed each resource
-        Session Duration: Time spent in learning sessions
-        Learning Progression: Sequential access to course materials
-        Submission Timing: When assignments were submitted relative to deadlines
-        Engagement Frequency: Daily/weekly activity patterns
-
-    Educational Features:
-        Course Information: Module codes, course difficulty levels, subject areas
-        Assessment Data: Assignment scores, assessment types, submission status
-        Learning Resources: Types of materials accessed (videos, documents, quizzes)
-        Course Structure: Sequential organization of learning materials
-        Academic Performance: Final grades and course outcomes
-
-    Demographic Features:
-        Student Characteristics: Age bands, gender, disability status
-        Educational Background: Highest education level, previous academic performance
-        Geographic Information: Region of student residence
-        Socioeconomic Indicators: Index of Multiple Deprivation (IMD) band
-        Study Mode: Full-time vs part-time enrollment
-
-Labels Present
-    Multi-class Classification with academic outcomes:
-        Primary Labels:
-            Pass: Student successfully completed the course
-            Fail: Student failed the course
-            Withdrawn: Student withdrew from the course
-            Distinction: Student achieved distinction level
-    Prediction Tasks:
-        Early Dropout Prediction: Predict students at risk of withdrawal
-        Performance Prediction: Predict final grades from early interactions
-        Engagement Classification: Classify student engagement levels
-        Label Format: Single-label classification per student per course presentation
-
-Goal/Purpose of the Task
-    Primary Objectives:
-        Student At-Risk Prediction: What are important predictors for negative course outcomes? (when final_result is withdraw or fail) BIFOLD-BigEarthNetv2-0 (BIFOLD BigEarthNet v2.0)
-        Learning Analytics: Analyze student learning behaviors and outcomes
-        Educational Data Mining: Discover patterns in online learning environments
-    Research Applications:
-        Early intervention systems for at-risk students
-        Personalized learning recommendations
-        Online course design optimization
-        Student engagement analysis
-        Dropout prevention strategies
-        Learning pathway optimization
-
-Dataset Scale:
-    32,593 students across multiple course presentations
-    7 different courses (modules) included
-    10,655,280 VLE interactions recorded
-    Multiple presentations: Courses offered in February (B) and October (J)
-    Assessment data: Multiple assignments per course
-    File size: Moderate (50-200 MB depending on version)
-    Time span: Multiple academic years of online learning data
-
-This dataset is particularly valuable for developing multimodal approaches that combine student behavioral data, demographic information, and temporal learning patterns to predict academic outcomes and optimize online learning experiences, making it ideal for educational technology research.
