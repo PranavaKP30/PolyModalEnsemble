@@ -44,7 +44,7 @@ class BagGeneration:
                  max_dropout_rate: float = 0.5,
                  min_modalities: int = 1,
                  sample_ratio: float = 0.8,
-                 random_state: Optional[int] = None):
+                 random_state: Optional[int] = 42):
         """
         Initialize the Bag Generation system.
         
@@ -64,7 +64,7 @@ class BagGeneration:
             Minimum number of modalities per bag
         sample_ratio : float, default=0.8
             Bootstrap sampling ratio
-        random_state : Optional[int], default=None
+        random_state : Optional[int], default=42
             Random seed for reproducibility
         """
         self.train_data = train_data

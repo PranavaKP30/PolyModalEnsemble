@@ -208,7 +208,7 @@ Creates n empty bags and sets up the dropout strategy, sampling ratio, and accep
 - **`max_dropout_rate`** (default=0.5): Maximum dropout rate - controls modality dropping intensity
 - **`min_modalities`** (default=1): Minimum modalities per bag - ensures minimum coverage
 - **`sample_ratio`** (default=0.8): Bootstrap sampling ratio - controls data usage per bag
-- **`random_state`** (default=None): Random seed - ensures reproducible results
+- **`random_state`** (default=42): Random seed - ensures reproducible results
 
 ### Step 2: Dropout Strategy Calculation
 Implements four distinct dropout strategies for ensemble diversity.
@@ -429,7 +429,7 @@ Determines how many modalities should be in each bag and the abundance of sample
 
 **Hyperparameters Used:**
 - **`min_modalities`** (default=1): Ensures each bag has at least this many active modalities
-- **`random_state`** (default=None): Controls random selection of dropped modalities for reproducibility
+- **`random_state`** (default=42): Controls random selection of dropped modalities for reproducibility
 
 ### Step 4: Sampling
 Performs bootstrap sampling based on the modality mask creation, empty bags, and gathered training data.
@@ -454,7 +454,7 @@ Performs bootstrap sampling based on the modality mask creation, empty bags, and
 **Hyperparameters Used:**
 - **`sample_ratio`** (default=0.8): Controls how much of the training data each bag uses (0.1-1.0)
 - **`n_bags`** (default=20): Determines how many bootstrap samples to create
-- **`random_state`** (default=None): Ensures reproducible bootstrap sampling
+- **`random_state`** (default=42): Ensures reproducible bootstrap sampling
 
 ### Step 5: Bag Data Extraction and Storage
 Extracts actual data for each bag and stores for usage in upcoming stages. Upcoming stages use these exact same bags created for future usage.
@@ -480,7 +480,7 @@ Extracts actual data for each bag and stores for usage in upcoming stages. Upcom
 **Hyperparameters Used:**
 - **`dropout_strategy`** (default="adaptive"): Determines if modality weights are computed based on importance
 - **`sample_ratio`** (default=0.8): Used in BagConfig metadata for tracking
-- **`random_state`** (default=None): Ensures consistent data extraction across runs
+- **`random_state`** (default=42): Ensures consistent data extraction across runs
 
 ### Step 6: Convenience Functions
 Core functionality for data access, testing, and analysis.

@@ -785,7 +785,21 @@ class ModelAPI:
         Parameters
         ----------
         **kwargs
-            Parameters for each stage of the pipeline
+            Parameters for each stage of the pipeline:
+            
+            Stage 2 Parameters:
+            - n_bags: Number of bags to generate (default: 10)
+            - dropout_strategy: Dropout strategy (default: 'adaptive')
+            - max_dropout_rate: Maximum dropout rate (default: 0.7)
+            - min_modalities: Minimum modalities per bag (default: 1)
+            - sample_ratio: Bootstrap sampling ratio (default: 0.8)
+            - random_state: Random seed (default: 42)
+            
+            Stage 2 Testing Parameters:
+            - run_stage2_tests: Whether to run Stage 2 tests (default: False)
+            - test_noise_level: Noise level for robustness testing (default: 0.1)
+            - test_verbose: Verbose test output (default: True)
+            - continue_on_test_failure: Continue pipeline if tests fail (default: True)
             
         Returns
         -------
@@ -799,8 +813,13 @@ class ModelAPI:
         api = (api.load_oasis_data(test_size=0.2)
                .run_complete_pipeline(
                    # Stage 2 parameters
-                   dropout_rates=[0.1, 0.2, 0.3],
                    n_bags=10,
+                   dropout_strategy='adaptive',
+                   max_dropout_rate=0.6,
+                   # Stage 2 testing parameters
+                   run_stage2_tests=True,
+                   test_noise_level=0.1,
+                   test_verbose=True,
                    # Stage 3 parameters
                    selection_strategy='performance_based',
                    # Stage 4 parameters
@@ -837,6 +856,29 @@ class ModelAPI:
             # Generate bags
             self.generate_bags(**stage2_params)
             logger.info("Stage 2: BagGeneration completed")
+            
+            # Stage 2: Testing (optional)
+            run_stage2_tests = kwargs.get('run_stage2_tests', False)
+            if run_stage2_tests:
+                test_noise_level = kwargs.get('test_noise_level', 0.1)
+                test_verbose = kwargs.get('test_verbose', True)
+                
+                if test_verbose:
+                    logger.info("Running Stage 2 tests...")
+                
+                try:
+                    test_results = self.run_stage2_tests(noise_level=test_noise_level)
+                    
+                    if test_verbose:
+                        logger.info("Stage 2 tests completed successfully")
+                        logger.info(f"  - Interpretability: {len(test_results.get('interpretability', {}))} analysis categories")
+                        logger.info(f"  - Robustness: {len(test_results.get('robustness', {}))} analysis categories")
+                        logger.info(f"  - Consistency: {len(test_results.get('consistency', {}))} validation checks")
+                except Exception as test_error:
+                    logger.warning(f"Stage 2 tests failed: {test_error}")
+                    if not kwargs.get('continue_on_test_failure', True):
+                        raise
+                        
         except Exception as e:
             logger.error(f"Stage 2: BagGeneration failed: {e}")
             raise
