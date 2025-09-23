@@ -86,25 +86,25 @@ Download Link
     Access: Public dataset, no registration required
 
 Modalities Present
-    Behavioral: Student interaction logs and learning analytics from Squirrel AI Learning system
-    Physiological: Brainwave data from BrainCo EEG headsets (attention, raw EEG, device events)
-    Visual: Webcam video features extracted by SRI International (facial landmarks, eye tracking, head pose)
+    Tabular: Student interaction logs and learning analytics from Squirrel AI Learning system (CSV files)
+    Time-series: Brainwave data from BrainCo EEG headsets (LOG files with attention, raw EEG, device events)
+    Structured Arrays: Webcam video features extracted by SRI International (NPY files with facial landmarks, eye tracking, head pose)
     Temporal: Synchronized timestamps across all modalities for cross-modal alignment
 
 Features Present
-    Behavioral Features (User Records):
+    Tabular Features (User Records - CSV files):
         Learning Analytics: Question-level student responses, correctness, response times
         Academic Structure: Course, section, topic, module, and knowledge point identifiers
         Learning Behavior: Hint usage, answer viewing, analysis viewing patterns
         Performance Metrics: Difficulty ratings, mastery tracking, proficiency estimates
         Subject Coverage: Mathematics, English, Physics, Chemistry, Chinese, English Reading
-    Physiological Features (Brainwave Data):
+    Time-series Features (Brainwave Data - LOG files):
         Attention Values: Derived attention scores (0-100) from BrainCo headset
         Raw EEG Data: Electrical potential differences with 160 data points per minute
         Frequency Bands: Alpha (8-12Hz), LowBeta (12-22Hz), HighBeta (22-32Hz), Gamma (32-56Hz)
         Device Events: Connection status and device state information
         Temporal Resolution: Second-by-second brainwave measurements
-    Visual Features (Webcam Data):
+    Structured Array Features (Webcam Data - NPY files):
         Facial Landmarks: 51-point facial landmark detection and tracking
         Eye Tracking: Pupil segmentation, iris landmarks (9 points per eye)
         Head Pose: 3D rotation angles and translation vectors
@@ -112,7 +112,7 @@ Features Present
         Gaze Analysis: Eye movement patterns and attention direction
     Synchronization Features:
         Cross-Modal Alignment: Timestamp-based synchronization across all modalities
-        Question-Level Mapping: Behavioral data linked to physiological and visual data
+        Question-Level Mapping: Tabular data linked to time-series and structured array data
         Session Tracking: Multi-session learning progression over time
 
 Labels Present
@@ -123,16 +123,16 @@ Labels Present
         Learning Mastery: Knowledge point mastery status (learned/not learned)
         Attention State: Attention level classification (high/medium/low) from brainwave data
         Engagement Level: Visual engagement indicators from webcam features
-    Behavioral Labels:
+    Tabular Labels:
         Response Time: Continuous variable (1-16899 seconds)
         Difficulty Rating: Ordinal scale (1-9, easiest to hardest)
         Hint Usage: Binary indicators for answer viewing and analysis viewing
         Learning Progress: Module completion and knowledge point mastery
-    Physiological Labels:
+    Time-series Labels:
         Attention Score: Continuous variable (0-100) from BrainCo headset
         EEG Frequency Bands: Alpha, Beta, Gamma wave energy levels
         Device Connectivity: Binary status (connected/disconnected)
-    Visual Labels:
+    Structured Array Labels:
         Facial Expression: Landmark-based emotion and engagement indicators
         Eye Movement: Gaze direction and pupil tracking data
         Head Orientation: 3D pose estimation for attention direction
@@ -140,10 +140,10 @@ Labels Present
 Goal/Purpose of the Task
     Primary Objectives:
         Learning Analytics: Predict student performance and learning outcomes from multimodal data
-        Attention Modeling: Correlate physiological attention with visual attention and learning success
+        Attention Modeling: Correlate time-series attention with structured array attention and learning success
         Engagement Detection: Identify student engagement patterns across different learning activities
         Adaptive Learning: Develop personalized learning recommendations based on multimodal signals
-        Educational AI: Enhance intelligent tutoring systems with physiological and visual feedback
+        Educational AI: Enhance intelligent tutoring systems with time-series and structured array feedback
     Research Applications:
         Multimodal learning analytics and educational data mining
         Attention and engagement modeling in educational contexts
@@ -153,19 +153,19 @@ Goal/Purpose of the Task
         Personalized learning and intelligent tutoring systems
 
 Dataset Scale:
-        Total Behavioral Samples: 30,002 question responses across 6 subjects
+        Total Tabular Samples: 30,002 question responses across 6 subjects
         Total Synced Samples: 28,595 samples with cross-modal alignment
-        Core Multimodal Dataset: 738 samples with all 3 modalities (Behavioral + Physiological + Visual)
-        Robustness Dataset: 28,593 samples with missing modalities (Behavioral + Physiological OR Behavioral + Visual)
+        Core Multimodal Dataset: 738 samples with all 3 modalities (Tabular + Time-series + Structured Arrays)
+        Robustness Dataset: 28,593 samples with missing modalities (Tabular + Time-series OR Tabular + Structured Arrays)
         Subject Distribution: Math (8,272), English (14,977), Physics (3,781), Chemistry (1,310), Chinese (1,567), English Reading (95)
-        Physiological Data: 2,981 brainwave samples (9.9% coverage)
-        Visual Data: 3,612 video samples (12.0% coverage)
+        Time-series Data: 2,981 brainwave samples (9.9% coverage)
+        Structured Array Data: 3,612 video samples (12.0% coverage)
         Students: 324 unique students across 2 learning centers
         Time Period: November-December 2018 (2-month data collection)
         File Size: ~2GB total (brainwave data available separately)
         Quality: Research-grade educational data with realistic cross-modal coverage
 
-This dataset is particularly valuable for developing robust multimodal machine learning approaches in educational technology. The core multimodal dataset (738 samples) enables true multimodal fusion learning, while the robustness dataset (28,593 samples) provides realistic testing scenarios for missing modality handling - a common challenge in real-world educational applications where sensors may fail or data collection may be incomplete.
+This dataset is particularly valuable for developing robust multimodal machine learning approaches in educational technology. The core multimodal dataset (738 samples) enables true multimodal fusion learning across tabular, time-series, and structured array modalities, while the robustness dataset (28,593 samples) provides realistic testing scenarios for missing modality handling - a common challenge in real-world educational applications where sensors may fail or data collection may be incomplete.
 
 Dataset 3: OASIS Alzheimer's Clinical Data
 
