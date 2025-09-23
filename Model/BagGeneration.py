@@ -16,6 +16,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 import time
 import logging
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import StandardScaler
 
 logger = logging.getLogger("bag_generation")
 
@@ -24,7 +27,7 @@ logger = logging.getLogger("bag_generation")
 class BagConfig:
     """Configuration for a single ensemble bag."""
     bag_id: int
-    data_indices: np.ndarray
+    data_indices: np.ndarray  # dtype: np.int64
     modality_mask: Dict[str, bool]
     modality_weights: Dict[str, float]
     dropout_rate: float
@@ -271,41 +274,29 @@ class BagGeneration:
         self.modality_importance = {}
         
         for modality_name, data in self.train_data.items():
-            # Normalize data to [0, 1] range to handle different scales
-            data_normalized = self._normalize_for_importance(data)
-            
-            # 1. Variance-based information content
-            if data_normalized.ndim > 1:
-                variance = float(np.mean(np.var(data_normalized, axis=0)))
-            else:
-                variance = float(np.var(data_normalized))
-            
-            # 2. Feature count balancing
-            feature_count = data.shape[1] if data.ndim > 1 else 1
-            feature_factor = np.log(feature_count + 1)
-            
-            # 3. Label correlation (intelligence component)
-            label_correlation = self._compute_label_correlation(data_normalized)
-            
-            # 4. Cross-modality redundancy (distinct combinations)
-            redundancy_penalty = self._compute_cross_modality_redundancy(data_normalized, modality_name)
-            
-            # 5. Data quality assessment
-            data_quality = self._assess_data_quality(data_normalized)
-            
-            # 6. Sophisticated importance combination
-            importance = (
-                variance * 
-                feature_factor * 
-                label_correlation * 
-                (1 - redundancy_penalty) * 
-                data_quality
-            )
-            
-            self.modality_importance[modality_name] = importance
+            try:
+                # Calculate predictive power for this modality
+                predictive_power = self._calculate_predictive_power(data, modality_name)
+                self.modality_importance[modality_name] = predictive_power
+                
+            except Exception as e:
+                logger.warning(f"Error calculating predictive power for {modality_name}: {e}")
+                # Fallback to variance-based importance
+                data_normalized = self._normalize_for_importance(data)
+                
+                if data_normalized.ndim > 1:
+                    variance = float(np.mean(np.var(data_normalized, axis=0)))
+                else:
+                    variance = float(np.var(data_normalized))
+                
+                feature_count = data.shape[1] if data.ndim > 1 else 1
+                feature_factor = np.log(feature_count + 1)
+                
+                importance = variance * feature_factor
+                self.modality_importance[modality_name] = importance
         
-        # Log importance scores
-        logger.info("Modality importance scores:")
+        # Log predictive power scores
+        logger.info("Predictive power scores:")
         for name, score in sorted(self.modality_importance.items(), key=lambda x: x[1], reverse=True):
             logger.info(f"  {name}: {score:.4f}")
         
@@ -380,13 +371,18 @@ class BagGeneration:
         logger.info(f"Generated {len(dropout_rates)} adaptive dropout rates with {len(used_combinations)} distinct combinations")
         return np.array(dropout_rates)
 
-    
+    # adaptive strategy functions
     def _normalize_for_importance(self, data: np.ndarray) -> np.ndarray:
         """
         Normalize data to [0, 1] range for fair importance comparison across modalities.
         """
         if data.size == 0:
             return data
+        
+        # Runtime check: Validate array shape
+        if data.ndim == 0:
+            logger.warning("Received scalar data, converting to 1D array")
+            data = np.array([data])
         
         # Handle different data types
         if data.dtype in [np.uint8, np.uint16, np.uint32]:
@@ -408,6 +404,10 @@ class BagGeneration:
         try:
             # Flatten multi-dimensional data for correlation calculation
             if data_normalized.ndim > 2:
+                # Runtime check: Ensure first dimension is samples
+                if data_normalized.shape[0] == 0:
+                    logger.warning("Empty data array, returning zero correlation")
+                    return 0.0
                 data_flat = data_normalized.reshape(data_normalized.shape[0], -1)
             else:
                 data_flat = data_normalized
@@ -440,11 +440,17 @@ class BagGeneration:
                     
                     # Flatten both datasets for comparison
                     if data_normalized.ndim > 2:
+                        # Runtime check: Ensure first dimension is samples
+                        if data_normalized.shape[0] == 0:
+                            continue  # Skip empty data
                         data_flat = data_normalized.reshape(data_normalized.shape[0], -1)
                     else:
                         data_flat = data_normalized
                     
                     if other_normalized.ndim > 2:
+                        # Runtime check: Ensure first dimension is samples
+                        if other_normalized.shape[0] == 0:
+                            continue  # Skip empty data
                         other_flat = other_normalized.reshape(other_normalized.shape[0], -1)
                     else:
                         other_flat = other_normalized
@@ -503,6 +509,195 @@ class BagGeneration:
         except Exception:
             # Fallback to moderate quality if assessment fails
             return 0.7
+    
+    def _calculate_predictive_power(self, modality_data: np.ndarray, modality_name: str) -> float:
+        """
+        Calculate predictive power of a modality using simplified assessment.
+        
+        Parameters
+        ----------
+        modality_data : np.ndarray
+            Data for the modality
+        modality_name : str
+            Name of the modality
+            
+        Returns
+        -------
+        float
+            Predictive power score (higher = more predictive)
+        """
+        try:
+            # Get labels for this modality
+            labels = self.train_labels
+            
+            # Ensure we have valid data
+            if modality_data.size == 0 or len(labels) == 0:
+                return 0.01
+            
+            # Ensure data and labels have same number of samples
+            min_samples = min(len(modality_data), len(labels))
+            if min_samples < 10:  # Need minimum samples for reliable assessment
+                return 0.01
+            
+            modality_data = modality_data[:min_samples]
+            labels = labels[:min_samples]
+            
+            # Simplified approach: Use CV score with variance fallback
+            cv_score = self._quick_cv_score(modality_data, labels)
+            
+            if cv_score > 0.1:  # If CV score is meaningful
+                return max(cv_score, 0.01)
+            else:
+                # Fallback to variance-based importance
+                data_variance = self._compute_data_variance(modality_data)
+                return max(data_variance, 0.01)
+            
+        except (ValueError, IndexError) as e:
+            logger.warning(f"Data error in predictive power calculation for {modality_name}: {e}")
+            return 0.01
+        except Exception as e:
+            logger.warning(f"Unexpected error in predictive power calculation for {modality_name}: {e}")
+            return 0.01
+    
+    def _quick_cv_score(self, modality_data: np.ndarray, labels: np.ndarray) -> float:
+        """Quick cross-validation score using a simple classifier."""
+        try:
+            from sklearn.ensemble import RandomForestClassifier
+            from sklearn.model_selection import cross_val_score
+            from sklearn.preprocessing import StandardScaler
+            
+            # Handle different data shapes
+            if modality_data.ndim > 2:
+                # Flatten high-dimensional data
+                modality_data = modality_data.reshape(len(modality_data), -1)
+            
+            # Standardize features
+            scaler = StandardScaler()
+            modality_data_scaled = scaler.fit_transform(modality_data)
+            
+            # Quick Random Forest for assessment
+            rf = RandomForestClassifier(
+                n_estimators=10,  # Small for speed
+                max_depth=5,
+                random_state=42,
+                n_jobs=1
+            )
+            
+            # 3-fold CV for speed
+            cv_scores = cross_val_score(rf, modality_data_scaled, labels, cv=3, scoring='accuracy')
+            
+            return float(np.mean(cv_scores))
+            
+        except Exception as e:
+            logger.debug(f"Error in quick CV score: {e}")
+            return 0.5  # Neutral score
+    
+    def _compute_feature_importance(self, modality_data: np.ndarray, labels: np.ndarray) -> float:
+        """Compute feature importance using a quick model."""
+        try:
+            from sklearn.ensemble import RandomForestClassifier
+            from sklearn.preprocessing import StandardScaler
+            
+            # Handle different data shapes
+            if modality_data.ndim > 2:
+                modality_data = modality_data.reshape(len(modality_data), -1)
+            
+            # Standardize features
+            scaler = StandardScaler()
+            modality_data_scaled = scaler.fit_transform(modality_data)
+            
+            # Quick Random Forest
+            rf = RandomForestClassifier(
+                n_estimators=10,
+                max_depth=5,
+                random_state=42,
+                n_jobs=1
+            )
+            
+            rf.fit(modality_data_scaled, labels)
+            
+            # Average feature importance
+            avg_importance = float(np.mean(rf.feature_importances_))
+            
+            return avg_importance
+            
+        except Exception as e:
+            logger.debug(f"Error in feature importance: {e}")
+            return 0.1  # Low importance fallback
+    
+    def _compute_importance_stability(self, modality_data: np.ndarray, labels: np.ndarray) -> float:
+        """Compute stability of importance across different samples."""
+        try:
+            from sklearn.ensemble import RandomForestClassifier
+            from sklearn.preprocessing import StandardScaler
+            
+            # Handle different data shapes
+            if modality_data.ndim > 2:
+                modality_data = modality_data.reshape(len(modality_data), -1)
+            
+            # Standardize features
+            scaler = StandardScaler()
+            modality_data_scaled = scaler.fit_transform(modality_data)
+            
+            # Bootstrap sampling for stability assessment
+            n_samples = len(modality_data_scaled)
+            n_bootstrap = 5  # Small number for speed
+            
+            importance_scores = []
+            
+            for _ in range(n_bootstrap):
+                # Bootstrap sample
+                indices = np.random.choice(n_samples, size=n_samples, replace=True)
+                X_boot = modality_data_scaled[indices]
+                y_boot = labels[indices]
+                
+                # Quick Random Forest
+                rf = RandomForestClassifier(
+                    n_estimators=5,  # Very small for speed
+                    max_depth=3,
+                    random_state=42,
+                    n_jobs=1
+                )
+                
+                rf.fit(X_boot, y_boot)
+                importance_scores.append(np.mean(rf.feature_importances_))
+            
+            # Stability = 1 - coefficient of variation
+            if len(importance_scores) > 1:
+                mean_importance = np.mean(importance_scores)
+                std_importance = np.std(importance_scores)
+                stability = 1.0 - (std_importance / (mean_importance + 1e-8))
+                stability = max(0.0, min(1.0, stability))  # Clamp to [0, 1]
+            else:
+                stability = 1.0
+            
+            return float(stability)
+            
+        except Exception as e:
+            logger.debug(f"Error in stability computation: {e}")
+            return 0.8  # High stability fallback
+    
+    def _compute_data_variance(self, modality_data: np.ndarray) -> float:
+        """Compute normalized data variance as a measure of informativeness."""
+        try:
+            # Handle different data shapes
+            if modality_data.ndim > 2:
+                modality_data = modality_data.reshape(len(modality_data), -1)
+            
+            # Compute variance across all features
+            feature_variances = np.var(modality_data, axis=0)
+            mean_variance = np.mean(feature_variances)
+            
+            # Normalize variance to [0, 1] range
+            # Use log scaling to handle large variance differences
+            normalized_variance = np.log(1 + mean_variance) / 10.0  # Scale down
+            normalized_variance = min(normalized_variance, 1.0)  # Cap at 1.0
+            
+            return normalized_variance
+            
+        except Exception as e:
+            logger.debug(f"Error in data variance computation: {e}")
+            return 0.1  # Small default variance
 
     # ============================================================================
     # STEP 3: MODALITY MASK CREATION
@@ -522,9 +717,12 @@ class BagGeneration:
             n_drop = int(np.floor(dropout_rate * self.n_modalities))
             n_drop = min(n_drop, self.n_modalities - self.min_modalities)
             
+            # Runtime check: Ensure n_drop is within valid bounds
+            n_drop = max(0, min(n_drop, self.n_modalities - 1))
+            
             # Create mask
             mask = np.ones(self.n_modalities, dtype=bool)
-            if n_drop > 0:
+            if n_drop > 0 and n_drop < self.n_modalities:
                 drop_indices = self._rng.choice(
                     np.arange(self.n_modalities), size=n_drop, replace=False
                 )
@@ -543,23 +741,40 @@ class BagGeneration:
     
     def _bootstrap_sampling(self) -> List[np.ndarray]:
         """
-        Step 4: Bootstrap Sampling.
-        Creates bootstrap sample indices for each bag.
+        Step 4: Robust Bootstrap Sampling with Guaranteed Consistency.
+        Creates bootstrap sample indices for each bag with guaranteed data consistency.
         """
-        logger.info("Step 4: Performing bootstrap sampling")
+        logger.info("Step 4: Performing robust bootstrap sampling with guaranteed consistency")
         
-        dataset_size = len(self.train_labels)
+        # ENHANCED FIX: Get consistent sample count across all modalities and labels
+        modality_sample_counts = {name: len(data) for name, data in self.train_data.items()}
+        label_count = len(self.train_labels)
+        
+        # Find the minimum sample count across all data sources
+        all_counts = list(modality_sample_counts.values()) + [label_count]
+        dataset_size = min(all_counts)
+        
+        if len(set(all_counts)) > 1:
+            logger.warning(f"Inconsistent sample counts: {modality_sample_counts}, labels: {label_count}")
+            logger.info(f"Using minimum sample count: {dataset_size} for guaranteed consistency")
+        
+        # Calculate target sample size
         n_samples = int(self.sample_ratio * dataset_size)
+        
+        # Ensure we don't request more samples than available
+        n_samples = min(n_samples, dataset_size)
         
         data_indices = []
         for bag_id in range(self.n_bags):
             # Create bootstrap sample with replacement
+            # Use only valid indices (0 to dataset_size-1)
             bag_indices = self._rng.choice(
                 np.arange(dataset_size), size=n_samples, replace=True
             )
             data_indices.append(bag_indices)
         
         logger.info(f"Created bootstrap samples for {len(data_indices)} bags ({n_samples} samples each)")
+        logger.info(f"All indices guaranteed to be in range [0, {dataset_size-1}]")
         return data_indices
 
     # ============================================================================
@@ -612,49 +827,19 @@ class BagGeneration:
             
             self.bags.append(bag)
             
-            # Extract and store actual bag data
+            # ENHANCED FIX: Simple and robust bag data extraction
             bag_data = {}
-            indices = data_indices[bag_id]
+            indices = data_indices[bag_id]  # These indices are already guaranteed to be valid
             
-            # Find the minimum sample count across all active modalities
-            min_samples = len(indices)
+            # Extract data for each active modality using the same indices
             for modality_name, is_active in modality_masks[bag_id].items():
                 if is_active and modality_name in self.train_data:
                     data = self.train_data[modality_name]
-                    min_samples = min(min_samples, len(data))
+                    # Since indices are guaranteed to be valid, we can directly use them
+                    bag_data[modality_name] = data[indices]
             
-            # Ensure we don't exceed the minimum available samples
-            if min_samples < len(indices):
-                logger.warning(f"Some modalities have fewer samples ({min_samples}) than requested ({len(indices)}). Using {min_samples} samples for consistency.")
-                # Truncate indices to the minimum available samples
-                indices = indices[:min_samples]
-            
-            # Update the bag's data_indices to reflect the actual indices used
-            self.bags[bag_id].data_indices = indices
-            
-            # Extract data for each active modality using consistent indices
-            for modality_name, is_active in modality_masks[bag_id].items():
-                if is_active and modality_name in self.train_data:
-                    data = self.train_data[modality_name]
-                    
-                    # Ensure indices are within bounds for this specific modality
-                    valid_indices = indices[indices < len(data)]
-                    if len(valid_indices) == 0:
-                        logger.warning(f"No valid indices for modality {modality_name}, skipping.")
-                        continue
-                    
-                    # Use the valid indices
-                    bag_data[modality_name] = data[valid_indices]
-            
-            # Store labels using the same consistent indices
-            if bag_data:  # Only if we have valid data
-                # Use the same indices that were used for the data
-                valid_label_indices = indices[indices < len(self.train_labels)]
-                if len(valid_label_indices) > 0:
-                    bag_data['labels'] = self.train_labels[valid_label_indices]
-                else:
-                    logger.warning(f"No valid label indices for bag {bag_id}")
-                    continue
+            # Store labels using the same indices (guaranteed to be valid)
+            bag_data['labels'] = self.train_labels[indices]
             
             # Store bag data
             self.bag_data[bag_id] = bag_data
@@ -814,7 +999,6 @@ class BagGeneration:
         logger.info(f"Bag consistency test completed: {len(test_results['errors'])} errors found")
         return test_results
 
-
     # ============================================================================
     # INTERPRETABILITY TESTS
     # ============================================================================
@@ -885,7 +1069,7 @@ class BagGeneration:
     # ============================================================================
     # ROBUSTNESS TESTS
     # ============================================================================
-    
+     
     def robustness_test(self, noise_level: float = 0.1) -> Dict[str, Any]:
         """Test robustness by adding noise to training data."""
         logger.info(f"Running robustness test with noise level {noise_level}")
