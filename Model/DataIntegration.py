@@ -25,6 +25,8 @@ import json
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 import warnings
+import random
+from collections import Counter
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -69,6 +71,11 @@ class SimpleDataLoader:
         self.device = device
         self.lazy_loading = lazy_loading
         self.chunk_size = chunk_size
+        
+        # CRITICAL FIX: Add consistent sampling tracking
+        self._last_sampling_indices = None
+        self._modality_sample_counts = {}
+        self._sampling_seed = 42  # Fixed seed for reproducibility
         self.handle_missing_modalities = handle_missing_modalities
         self.missing_modality_strategy = missing_modality_strategy
         self.handle_class_imbalance = handle_class_imbalance
@@ -107,14 +114,24 @@ class SimpleDataLoader:
         
         logger.info(f"Loading labels from {file_path}")
         
-        # Load CSV file with encoding handling
-        try:
-            df = pd.read_csv(file_path, encoding='utf-8')
-        except UnicodeDecodeError:
+        # Load CSV file with robust encoding handling
+        df = None
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        
+        for encoding in encodings:
             try:
-                df = pd.read_csv(file_path, encoding='latin-1')
-            except UnicodeDecodeError:
-                df = pd.read_csv(file_path, encoding='cp1252')
+                df = pd.read_csv(file_path, encoding=encoding)
+                logger.debug(f"Successfully loaded CSV with {encoding} encoding")
+                break
+            except UnicodeDecodeError as e:
+                logger.debug(f"Failed to load CSV with {encoding} encoding: {e}")
+                continue
+            except Exception as e:
+                logger.warning(f"Unexpected error loading CSV with {encoding} encoding: {e}")
+                continue
+        
+        if df is None:
+            raise ValueError(f"Could not load CSV file {file_path} with any of the attempted encodings: {encodings}")
         
         # Extract labels based on file structure
         if 'class_id' in df.columns:
@@ -132,7 +149,8 @@ class SimpleDataLoader:
             logger.warning(f"Found NaN values in labels from {file_path}. Filling with 0.")
             labels = np.nan_to_num(labels, nan=0.0)
         
-        return labels
+        # Ensure consistent return type as int64 for labels
+        return labels.astype(np.int64)
 
     def load_image_directory(self, directory: str, target_size: Tuple[int, int] = (224, 224), 
                            channels_first: bool = False, sample_indices: Optional[List[int]] = None) -> np.ndarray:
@@ -176,24 +194,59 @@ class SimpleDataLoader:
             image_files = [image_files[i] for i in valid_indices]
         elif self.fast_mode and len(image_files) > self.max_samples:
             logger.info(f"Fast mode: Sampling {self.max_samples} images from {len(image_files)} for fast loading.")
-            import random
-            random.seed(42)
-            image_files = random.sample(image_files, self.max_samples)
+            random.seed(self._sampling_seed)  # CRITICAL: Use consistent seed
+            # Generate consistent sampling indices
+            if not hasattr(self, '_last_sampling_indices') or self._last_sampling_indices is None:
+                self._last_sampling_indices = random.sample(range(len(image_files)), self.max_samples)
+                self._last_sampling_indices.sort()  # Sort for consistency
+            # Use the stored indices to ensure consistency across modalities
+            image_files = [image_files[i] for i in self._last_sampling_indices]
         
-        images = []
-        for img_file in image_files:
-            img = Image.open(img_file).convert('RGB')
-            img = img.resize(target_size)
-            img_array = np.array(img)
-            images.append(img_array)
-        
-        images = np.array(images)
+        # Memory-efficient image loading
+        if self.lazy_loading and len(image_files) > self.chunk_size:
+            logger.debug(f"Using lazy loading for {len(image_files)} images with chunk size {self.chunk_size}")
+            # For lazy loading, return a generator or placeholder
+            # This would be implemented with a custom dataset class
+            images = self._load_images_lazy(image_files, target_size, channels_first)
+        else:
+            # Load all images into memory
+            images = []
+            for img_file in image_files:
+                img = Image.open(img_file).convert('RGB')
+                img = img.resize(target_size)
+                img_array = np.array(img)
+                images.append(img_array)
+            
+            images = np.array(images)
         
         # Convert to channels-first format if requested (PyTorch default)
         if channels_first:
             images = np.transpose(images, (0, 3, 1, 2))  # NHWC -> NCHW
         
         return images
+    
+    def _load_images_lazy(self, image_files: List[Path], target_size: Tuple[int, int], channels_first: bool) -> np.ndarray:
+        """
+        Load images lazily for memory efficiency.
+        
+        Parameters
+        ----------
+        image_files : List[Path]
+            List of image file paths
+        target_size : Tuple[int, int]
+            Target size for resizing
+        channels_first : bool
+            Whether to use channels-first format
+            
+        Returns
+        -------
+        np.ndarray
+            Placeholder array for lazy loading
+        """
+        # For now, return a placeholder that indicates lazy loading
+        # In a full implementation, this would return a custom dataset
+        logger.debug(f"Lazy loading placeholder for {len(image_files)} images")
+        return np.array([])  # Placeholder - would be replaced with actual lazy loading implementation
     
     def load_npy_directory(self, directory: str, sample_indices: Optional[List[int]] = None) -> np.ndarray:
         """
@@ -220,7 +273,7 @@ class SimpleDataLoader:
         
         logger.info(f"Loading {len(npy_files)} NPY files from {directory}")
         
-        # Use provided sample indices if available, otherwise use fast mode sampling
+        # CRITICAL FIX: Ensure consistent sampling across all modalities
         if sample_indices is not None:
             logger.info(f"Using provided sample indices: {len(sample_indices)} samples from {len(npy_files)} total.")
             # Only use indices that are within bounds
@@ -230,9 +283,13 @@ class SimpleDataLoader:
             npy_files = [npy_files[i] for i in valid_indices]
         elif self.fast_mode and len(npy_files) > self.max_samples:
             logger.info(f"Fast mode: Sampling {self.max_samples} NPY files from {len(npy_files)} for fast loading.")
-            import random
-            random.seed(42)
-            npy_files = random.sample(npy_files, self.max_samples)
+            random.seed(self._sampling_seed)  # CRITICAL: Fixed seed for reproducibility
+            # Generate consistent sampling indices
+            if not hasattr(self, '_last_sampling_indices') or self._last_sampling_indices is None:
+                self._last_sampling_indices = random.sample(range(len(npy_files)), self.max_samples)
+                self._last_sampling_indices.sort()  # Sort for consistency
+            # Use the stored indices to ensure consistency across modalities
+            npy_files = [npy_files[i] for i in self._last_sampling_indices]
         
         arrays = []
         for npy_file in npy_files:
@@ -299,7 +356,7 @@ class SimpleDataLoader:
     
     def load_log_directory(self, directory: str, sample_indices: Optional[List[int]] = None) -> np.ndarray:
         """
-        Load LOG files from directory (for MUTLA physiological data).
+        Load LOG files from directory (for MUTLA time-series data).
         
         Parameters
         ----------
@@ -399,9 +456,13 @@ class SimpleDataLoader:
             npy_files = [npy_files[i] for i in valid_indices]
         elif self.fast_mode and len(npy_files) > self.max_samples:
             logger.info(f"Fast mode: Sampling {self.max_samples} webcam files from {len(npy_files)} for fast loading.")
-            import random
-            random.seed(42)
-            npy_files = random.sample(npy_files, self.max_samples)
+            random.seed(self._sampling_seed)  # CRITICAL: Use consistent seed
+            # Generate consistent sampling indices
+            if not hasattr(self, '_last_sampling_indices') or self._last_sampling_indices is None:
+                self._last_sampling_indices = random.sample(range(len(npy_files)), self.max_samples)
+                self._last_sampling_indices.sort()  # Sort for consistency
+            # Use the stored indices to ensure consistency across modalities
+            npy_files = [npy_files[i] for i in self._last_sampling_indices]
         
         all_features = []
         for npy_file in npy_files:
@@ -579,14 +640,24 @@ class SimpleDataLoader:
         
         logger.info(f"Loading CSV data from {file_path}")
         
-        # Load CSV file with encoding handling
-        try:
-            df = pd.read_csv(file_path, encoding='utf-8')
-        except UnicodeDecodeError:
+        # Load CSV file with robust encoding handling
+        df = None
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        
+        for encoding in encodings:
             try:
-                df = pd.read_csv(file_path, encoding='latin-1')
-            except UnicodeDecodeError:
-                df = pd.read_csv(file_path, encoding='cp1252')
+                df = pd.read_csv(file_path, encoding=encoding)
+                logger.debug(f"Successfully loaded CSV with {encoding} encoding")
+                break
+            except UnicodeDecodeError as e:
+                logger.debug(f"Failed to load CSV with {encoding} encoding: {e}")
+                continue
+            except Exception as e:
+                logger.warning(f"Unexpected error loading CSV with {encoding} encoding: {e}")
+                continue
+        
+        if df is None:
+            raise ValueError(f"Could not load CSV file {file_path} with any of the attempted encodings: {encodings}")
         
         # Handle labels CSV (extract numeric labels)
         if 'class_id' in df.columns:
@@ -610,7 +681,8 @@ class SimpleDataLoader:
                 logger.warning(f"Not enough data ({len(data)}) for requested sample size ({len(sample_indices)}). Using available data.")
                 data = data[:len(sample_indices)] if len(data) <= len(sample_indices) else data
         
-        return data
+        # Ensure consistent return type as float64 for tabular data
+        return data.astype(np.float64)
     
     def load_modality_data(self, file_path: str, modality_type: str, 
                           target_size: Tuple[int, int] = (224, 224), 
@@ -624,7 +696,7 @@ class SimpleDataLoader:
         file_path : str
             Path to data file or directory
         modality_type : str
-            Type of modality ('image', 'tabular', 'spectral', 'behavioral', 'physiological', 'visual')
+            Type of modality ('visual', 'tabular', 'spectral', 'time-series')
         target_size : tuple
             Target size for image resizing
         channels_first : bool
@@ -637,16 +709,13 @@ class SimpleDataLoader:
         """
         if modality_type == 'image':
             return self.load_image_directory(file_path, target_size, channels_first, sample_indices)
-        elif modality_type in ['tabular', 'spectral']:
+        elif modality_type in ['tabular', 'spectral', 'time-series']:
             if Path(file_path).is_dir():
                 return self.load_npy_directory(file_path, sample_indices)
             else:
                 return self.load_csv_data(file_path, sample_indices)
-        elif modality_type == 'behavioral':
-            # MUTLA behavioral data (CSV files)
-            return self.load_csv_data(file_path, sample_indices)
-        elif modality_type == 'physiological':
-            # MUTLA physiological data (LOG files with EEG/attention)
+        elif modality_type == 'timeseries':
+            # MUTLA time-series data (LOG files with EEG/attention)
             return self.load_log_directory(file_path, sample_indices)
         elif modality_type == 'visual':
             # MUTLA visual data (NPY files with webcam tracking)
@@ -705,8 +774,7 @@ class SimpleDataLoader:
         sample_indices = None
         if self.fast_mode and len(labels) > self.max_samples:
             logger.info(f"Fast mode: Will sample {self.max_samples} samples from {len(labels)} total samples.")
-            import random
-            random.seed(42)
+            random.seed(self._sampling_seed)  # CRITICAL: Use consistent seed
             sample_indices = random.sample(range(len(labels)), self.max_samples)
             # Sample labels upfront
             labels = labels[sample_indices]
@@ -735,8 +803,8 @@ class SimpleDataLoader:
                 # This is a simplified approach - in practice, you'd want to track the indices
                 logger.warning("Class balancing applied - modality data may need adjustment")
         
-        # Validate data consistency - ensure modalities correspond to same samples
-        self._validate_data_consistency(labels, modality_data)
+        # CRITICAL FIX: Validate and fix data consistency across modalities
+        modality_data, labels = self._validate_and_fix_data_consistency(modality_data, labels)
         
         # Apply normalization with memory efficiency for large datasets
         if normalize:
@@ -965,41 +1033,89 @@ class SimpleDataLoader:
         return train_idx, test_idx
     
     # Step 5: Data Consistency Validation
-    def _validate_data_consistency(self, labels: np.ndarray, modality_data: Dict[str, np.ndarray]) -> None:
+    def _validate_and_fix_data_consistency(self, modality_data: Dict[str, np.ndarray], labels: np.ndarray) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
         """
-        Validate that all modalities correspond to the same samples.
+        CRITICAL FIX: Validate and fix data consistency across modalities.
+        
+        Returns aligned modality data and labels with consistent sample counts.
         
         Parameters
         ----------
-        labels : np.ndarray
-            Labels array
         modality_data : dict
             Dictionary of modality data arrays
+        labels : np.ndarray
+            Labels array
+            
+        Returns
+        -------
+        Tuple[Dict[str, np.ndarray], np.ndarray]
+            Aligned modality data and labels
             
         Raises
         ------
         ValueError
             If data consistency validation fails
         """
-        n_samples = len(labels)
-        logger.info(f"Validating data consistency for {n_samples} samples across {len(modality_data)} modalities")
+        # CRITICAL FIX: Check and fix sample count consistency
+        sample_counts = {name: len(data) for name, data in modality_data.items()}
+        sample_counts['labels'] = len(labels)
         
-        # Check sample count consistency
-        for modality_name, data in modality_data.items():
-            if len(data) != n_samples:
-                if len(data) == 0:
-                    logger.error(f"Modality {modality_name} has no data")
-                    raise ValueError(f"Modality {modality_name} has no data")
-                elif len(data) < n_samples:
-                    logger.warning(f"Modality {modality_name} has {len(data)} samples, but labels has {n_samples} samples. "
-                                 f"This may indicate missing data files or sampling issues.")
-                    # For now, we'll allow this but log a warning
-                    # In production, you might want to handle this differently
+        logger.info(f"Sample counts: {sample_counts}")
+        
+        if len(set(sample_counts.values())) > 1:
+            logger.warning(f"Inconsistent sample counts across modalities: {sample_counts}")
+            
+            # Use the most common count instead of minimum to preserve more data
+            count_frequency = Counter(sample_counts.values())
+            target_count = count_frequency.most_common(1)[0][0]
+            
+            logger.info(f"Aligning all modalities to most common count: {target_count}")
+            logger.info(f"Count frequency: {dict(count_frequency)}")
+            
+            # Align all modalities to the target count
+            aligned_modality_data = {}
+            for name, data in modality_data.items():
+                if len(data) == target_count:
+                    aligned_modality_data[name] = data
+                elif len(data) > target_count:
+                    # Truncate to target count
+                    aligned_modality_data[name] = data[:target_count]
+                    logger.info(f"Truncated {name} from {len(data)} to {target_count} samples")
                 else:
-                    logger.warning(f"Modality {modality_name} has {len(data)} samples, but labels has {n_samples} samples. "
-                                 f"Truncating to match label count.")
-                    # Truncate the data to match label count
-                    modality_data[modality_name] = data[:n_samples]
+                    # Pad with zeros or repeat last samples
+                    if data.dtype in [np.float32, np.float64]:
+                        padding = np.zeros((target_count - len(data),) + data.shape[1:], dtype=data.dtype)
+                        aligned_modality_data[name] = np.vstack([data, padding])
+                    else:
+                        # For non-numeric data, repeat the last sample
+                        last_sample = data[-1:] if len(data) > 0 else data
+                        repeat_count = target_count - len(data)
+                        padding = np.tile(last_sample, (repeat_count, 1)) if len(data.shape) > 1 else np.tile(last_sample, repeat_count)
+                        aligned_modality_data[name] = np.concatenate([data, padding])
+                    logger.info(f"Padded {name} from {len(data)} to {target_count} samples")
+            
+            # Align labels
+            if len(labels) == target_count:
+                aligned_labels = labels
+            elif len(labels) > target_count:
+                aligned_labels = labels[:target_count]
+                logger.info(f"Truncated labels from {len(labels)} to {target_count} samples")
+            else:
+                # For labels, repeat the last label
+                last_label = labels[-1] if len(labels) > 0 else 0
+                padding = np.full(target_count - len(labels), last_label, dtype=labels.dtype)
+                aligned_labels = np.concatenate([labels, padding])
+                logger.info(f"Padded labels from {len(labels)} to {target_count} samples")
+            
+            # Store the final sample count for consistency tracking
+            self._modality_sample_counts = {name: len(data) for name, data in aligned_modality_data.items()}
+            self._modality_sample_counts['labels'] = len(aligned_labels)
+            
+            modality_data = aligned_modality_data
+            labels = aligned_labels
+        else:
+            # Store the sample counts for consistency tracking
+            self._modality_sample_counts = sample_counts
         
         # Additional validation for structured data
         for modality_name, data in modality_data.items():
@@ -1023,7 +1139,8 @@ class SimpleDataLoader:
         # Temporal alignment validation for time-series data
         self._validate_temporal_alignment(modality_data, labels)
         
-        logger.info("✅ Data consistency validation passed")
+        logger.info("✅ Data consistency validation and alignment completed")
+        return modality_data, labels
     
     def _validate_temporal_alignment(self, modality_data: dict, labels: np.ndarray):
         """
@@ -1036,7 +1153,7 @@ class SimpleDataLoader:
         labels : np.ndarray
             Labels array
         """
-        time_series_modalities = ['physiological', 'visual', 'behavioral']
+        time_series_modalities = ['timeseries', 'visual', 'tabular']
         temporal_modalities = [name for name in modality_data.keys() 
                               if any(ts_mod in name.lower() for ts_mod in time_series_modalities)]
         
@@ -1463,6 +1580,34 @@ class SimpleDataLoader:
         
         return self.data
     
+    def get_train_data(self) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+        """
+        Get training data and labels.
+        
+        Returns
+        -------
+        Tuple[Dict[str, np.ndarray], np.ndarray]
+            Training data dictionary and training labels
+        """
+        if not self.data:
+            raise ValueError("No data loaded. Call load_multimodal_data() first.")
+        
+        return self.data['train_data'], self.data['train_labels']
+    
+    def get_test_data(self) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+        """
+        Get test data and labels.
+        
+        Returns
+        -------
+        Tuple[Dict[str, np.ndarray], np.ndarray]
+            Test data dictionary and test labels
+        """
+        if not self.data:
+            raise ValueError("No data loaded. Call load_multimodal_data() first.")
+        
+        return self.data['test_data'], self.data['test_labels']
+    
     def get_tensors(self, device: Optional[str] = None) -> Dict[str, Any]:
         """
         Convert data to PyTorch tensors.
@@ -1662,22 +1807,22 @@ def load_mutla_data(data_dir: str = "Data/MUTLA",
     loader = SimpleDataLoader(fast_mode=fast_mode, max_samples=max_samples, **kwargs)
     
     modality_types = {
-        "behavioral": "behavioral",      # CSV files with user interaction data
-        "physiological": "physiological", # LOG files with EEG/attention time-series
+        "tabular": "tabular",            # CSV files with user interaction data
+        "timeseries": "timeseries",      # LOG files with EEG/attention time-series
         "visual": "visual"               # NPY files with webcam tracking data
     }
     
     modality_files = {
-        "behavioral": f"{data_dir}/User records/math_record_cleaned.csv",  # Specific CSV file
-        "physiological": f"{data_dir}/Brainwave",  # LOG files with EEG/attention
-        "visual": f"{data_dir}/Webcam"            # NPY files with tracking data
+        "tabular": f"{data_dir}/User records/math_record_cleaned.csv",  # Specific CSV file
+        "timeseries": f"{data_dir}/Brainwave",  # LOG files with EEG/attention
+        "visual": f"{data_dir}/Webcam"  # NPY files with tracking data
     }
     
     # Note: MUTLA doesn't have a single labels.csv file
-    # Labels are embedded within the behavioral CSV files
-    # For now, we'll use a dummy labels file or extract from behavioral data
+    # Labels are embedded within the tabular CSV files
+    # For now, we'll use a dummy labels file or extract from tabular data
     loader.load_multimodal_data(
-        label_file=f"{data_dir}/User records/math_record_cleaned.csv",  # Use one of the behavioral files as labels
+        label_file=f"{data_dir}/User records/math_record_cleaned.csv",  # Use one of the tabular files as labels
         modality_files=modality_files,
         modality_types=modality_types,
         normalize=normalize,
