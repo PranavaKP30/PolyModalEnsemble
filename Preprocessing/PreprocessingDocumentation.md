@@ -1002,26 +1002,26 @@ Data/MUTLA/
 
 #### 4. Temporal Synchronization
 - **Cross-Modal Alignment**: Timestamp-based synchronization across all modalities
-- **Question-Level Mapping**: Behavioral data linked to physiological and visual data
+- **Question-Level Mapping**: Tabular data linked to time-series and structured array data
 - **Session Tracking**: Multi-session learning progression over time
 
 ### Required Preprocessing Steps
 
 #### Step 1: Data Integration and Cross-Modal Alignment
 - Load synchronized data from schoolg.txt and schooln.txt
-- Merge behavioral data from User records with sync information
+- Merge tabular data from User records with sync information
 - Create unified sample IDs for cross-modal tracking
 - Handle missing modality data (empty file paths in sync files)
 
-#### Step 2: Behavioral Features Extraction
+#### Step 2: Tabular Features Extraction
 
-**Objective**: Extract comprehensive behavioral features from user records
+**Objective**: Extract comprehensive tabular features from user records
 
 **Implementation**:
 ```python
-def extract_behavioral_features(user_records_path, synced_data):
+def extract_tabular_features(user_records_path, synced_data):
     """
-    Extract behavioral features from MUTLA user records
+    Extract tabular features from MUTLA user records
     """
     import pandas as pd
     import numpy as np
@@ -1037,7 +1037,7 @@ def extract_behavioral_features(user_records_path, synced_data):
         'en_reading_record_cleaned.csv': 'english_reading'
     }
     
-    all_behavioral_data = []
+    all_tabular_data = []
     
     for file, subject in subject_files.items():
         file_path = user_records_path / file
@@ -1070,8 +1070,8 @@ def extract_behavioral_features(user_records_path, synced_data):
             df = df.rename(columns=column_mapping)
             df['subject'] = subject
             
-            # Extract behavioral features
-            behavioral_features = []
+            # Extract tabular features
+            tabular_features = []
             for idx, row in df.iterrows():
                 features = {
                     'sample_id': f"{subject}_{row['question_id']}_{row['user_id']}",
@@ -1100,12 +1100,12 @@ def extract_behavioral_features(user_records_path, synced_data):
                     'session_duration': calculate_session_duration(row.get('start_time', ''), row.get('completion_time', ''))
                 }
                 
-                behavioral_features.append(features)
+                tabular_features.append(features)
             
-            all_behavioral_data.extend(behavioral_features)
-            print(f"Extracted {len(behavioral_features)} behavioral features from {subject}")
+            all_tabular_data.extend(tabular_features)
+            print(f"Extracted {len(tabular_features)} tabular features from {subject}")
     
-    return pd.DataFrame(all_behavioral_data)
+    return pd.DataFrame(all_tabular_data)
 
 def calculate_session_duration(start_time, completion_time):
     """Calculate session duration in seconds"""
@@ -1121,15 +1121,15 @@ def calculate_session_duration(start_time, completion_time):
         return 0
 ```
 
-#### Step 3: Physiological Features Extraction
+#### Step 3: Time-series Features Extraction
 
-**Objective**: Extract physiological features from brainwave log files
+**Objective**: Extract time-series features from brainwave log files
 
 **Implementation**:
 ```python
-def extract_physiological_features(brainwave_path, synced_data):
+def extract_timeseries_features(brainwave_path, synced_data):
     """
-    Extract physiological features from MUTLA brainwave data
+    Extract time-series features from MUTLA brainwave data
     """
     import pandas as pd
     import numpy as np
@@ -1138,7 +1138,7 @@ def extract_physiological_features(brainwave_path, synced_data):
     from scipy import signal
     from scipy.fft import fft, fftfreq
     
-    physiological_features = []
+    timeseries_features = []
     
     for idx, row in synced_data.iterrows():
         sample_id = row['sample_id']
@@ -1171,9 +1171,9 @@ def extract_physiological_features(brainwave_path, synced_data):
             event_data = parse_events_log(events_file)
             features.update(event_data)
         
-        physiological_features.append(features)
+        timeseries_features.append(features)
     
-    return pd.DataFrame(physiological_features)
+    return pd.DataFrame(timeseries_features)
 
 def find_brainwave_file(brainwave_path, row, file_type):
     """Find brainwave file for given sample and type"""
@@ -1392,15 +1392,15 @@ def calculate_trend(values):
     return slope
 ```
 
-#### Step 4: Visual Features Extraction
+#### Step 4: Visual Modality Features Extraction
 
-**Objective**: Extract visual features from facial landmarks and eye tracking data
+**Objective**: Extract visual modality features from structured arrays (facial landmarks and eye tracking data)
 
 **Implementation**:
 ```python
 def extract_visual_features(webcam_path, synced_data):
     """
-    Extract visual features from MUTLA webcam data
+    Extract visual modality features from MUTLA structured arrays
     """
     import pandas as pd
     import numpy as np
@@ -1413,7 +1413,7 @@ def extract_visual_features(webcam_path, synced_data):
         sample_id = row['sample_id']
         video_id = row.get('video_id', '')
         
-        # Find visual files for this sample
+        # Find visual feature files for this sample
         landmark_file = find_visual_file(webcam_path, row, 'landmarks')
         eye_tracking_file = find_visual_file(webcam_path, row, 'eye_tracking')
         
@@ -1441,7 +1441,7 @@ def extract_visual_features(webcam_path, synced_data):
     return pd.DataFrame(visual_features)
 
 def find_visual_file(webcam_path, row, file_type):
-    """Find visual file for given sample and type"""
+    """Find visual feature file for given sample and type"""
     school = row['school']
     video_id = row.get('video_id', '')
     
@@ -1743,7 +1743,7 @@ def validate_mutla_preprocessing(processed_path):
                 validation_results['errors'].append(f"Missing required file: {file}")
         
         # Check required directories exist
-        required_dirs = ['behavioral', 'physiological', 'visual']
+        required_dirs = ['tabular', 'timeseries', 'visual']
         for dir_name in required_dirs:
             if not os.path.exists(f"{processed_path}/{dir_name}"):
                 validation_results['errors'].append(f"Missing required directory: {dir_name}")
@@ -1797,20 +1797,20 @@ def validate_mutla_preprocessing(processed_path):
                         validation_results['errors'].append(f"Error reading {modality} file {sample_file}: {e}")
         
         # Validate cross-modal alignment
-        if 'behavioral' in validation_results['sample_counts'] and 'physiological' in validation_results['sample_counts']:
-            behavioral_count = validation_results['sample_counts']['behavioral']
-            physiological_count = validation_results['sample_counts']['physiological']
+        if 'tabular' in validation_results['sample_counts'] and 'timeseries' in validation_results['sample_counts']:
+            tabular_count = validation_results['sample_counts']['tabular']
+            timeseries_count = validation_results['sample_counts']['timeseries']
             visual_count = validation_results['sample_counts'].get('visual', 0)
             
             # Check for expected cross-modal coverage
-            if behavioral_count != physiological_count:
-                validation_results['warnings'].append(f"Cross-modal alignment issue: behavioral={behavioral_count}, physiological={physiological_count}")
+            if tabular_count != timeseries_count:
+                validation_results['warnings'].append(f"Cross-modal alignment issue: tabular={tabular_count}, timeseries={timeseries_count}")
             
             # Calculate corruption rates
             total_expected = expected_sample_count
             validation_results['corruption_rates'] = {
-                'behavioral': (total_expected - behavioral_count) / total_expected * 100,
-                'physiological': (total_expected - physiological_count) / total_expected * 100,
+                'tabular': (total_expected - tabular_count) / total_expected * 100,
+                'timeseries': (total_expected - timeseries_count) / total_expected * 100,
                 'visual': (total_expected - visual_count) / total_expected * 100
             }
         

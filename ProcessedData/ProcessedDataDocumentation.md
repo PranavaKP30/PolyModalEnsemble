@@ -126,26 +126,26 @@ The MUTLA dataset has been preprocessed into 4 distinct dataset variants to hand
 ProcessedData/MUTLA/
 ├── Complete/                     # Complete Mixed Modality Dataset
 │   ├── labels.csv               # 28,593 samples with all labels
-│   ├── behavioral_features.csv  # Behavioral features for all samples
-│   ├── physiological_features.csv # Physiological features (2,981 samples)
+│   ├── tabular_features.csv     # Tabular features for all samples
+│   ├── timeseries_features.csv   # Time-series features (2,981 samples)
 │   ├── visual_features.csv      # Visual features (3,612 samples)
 │   ├── modality_availability.csv # Modality availability matrix
 │   └── metadata.json            # Dataset statistics
 ├── PerfectMultimodal/           # Perfect Multimodal Dataset
 │   ├── labels.csv               # 738 samples with all 3 modalities
-│   ├── behavioral_features.csv  # Behavioral features
-│   ├── physiological_features.csv # Physiological features
+│   ├── tabular_features.csv     # Tabular features
+│   ├── timeseries_features.csv   # Time-series features
 │   ├── visual_features.csv      # Visual features
 │   ├── modality_availability.csv # All samples have all modalities
 │   └── metadata.json            # Dataset statistics
-├── BehavioralPhysiological/     # Behavioral + Physiological Dataset
+├── TabularPhysiological/        # Tabular + Physiological Dataset
 │   ├── labels.csv               # 2,981 samples with both modalities
-│   ├── behavioral_features.csv  # Behavioral features
-│   ├── physiological_features.csv # Physiological features
+│   ├── tabular_features.csv     # Tabular features
+│   ├── timeseries_features.csv   # Time-series features
 │   └── metadata.json            # Dataset statistics
-└── BehavioralVisual/            # Behavioral + Visual Dataset
+└── TabularVisual/               # Tabular + Visual Dataset
     ├── labels.csv               # 3,612 samples with both modalities
-    ├── behavioral_features.csv  # Behavioral features
+    ├── tabular_features.csv     # Tabular features
     ├── visual_features.csv      # Visual features
     └── metadata.json            # Dataset statistics
 ```
@@ -168,21 +168,21 @@ ProcessedData/MUTLA/
 - **Modality Coverage**: 100% (all samples have all modalities)
 - **Use Case**: True multimodal fusion learning
 
-#### 3. Behavioral + Physiological Dataset
+#### 3. Tabular + Time-series Dataset
 - **Samples**: 2,981 samples
-- **Purpose**: Samples with behavioral and physiological data
-- **Modality Coverage**: Behavioral + Physiological only
+- **Purpose**: Samples with tabular and time-series data
+- **Modality Coverage**: Tabular + Time-series only
 - **Use Case**: Learning analytics with brainwave data
 
-#### 4. Behavioral + Visual Dataset
+#### 4. Tabular + Visual Dataset
 - **Samples**: 3,612 samples
-- **Purpose**: Samples with behavioral and visual data
-- **Modality Coverage**: Behavioral + Visual only
+- **Purpose**: Samples with tabular and visual data
+- **Modality Coverage**: Tabular + Visual only
 - **Use Case**: Learning analytics with visual attention data
 
 ### Modalities and Features
 
-#### 1. Behavioral Modality
+#### 1. Tabular Modality
 - **Format**: CSV file with 28,593 rows
 - **Features**:
   - Learning Analytics: Question responses, correctness, response times
@@ -218,7 +218,7 @@ ProcessedData/MUTLA/
   - Correctness: Binary (correct/incorrect) for each question
   - Performance Level: Continuous performance metrics
   - Learning Mastery: Knowledge point mastery status
-- **Coverage**: All samples have behavioral labels
+- **Coverage**: All samples have tabular labels
 
 ### Data Quality and Validation
 - **Cross-Modal Alignment**: Timestamp-based synchronization verified
@@ -233,13 +233,13 @@ from Preprocessing.MUTLA import load_mutla_for_mainmodel
 # Load Perfect Multimodal dataset (recommended)
 data = load_mutla_for_mainmodel(
     data_dir="ProcessedData/MUTLA/PerfectMultimodal",
-    modalities=['behavioral', 'physiological', 'visual']
+    modalities=['tabular', 'timeseries', 'visual']
 )
 
 # Load Complete dataset for robustness testing
 data = load_mutla_for_mainmodel(
     data_dir="ProcessedData/MUTLA/Complete",
-    modalities=['behavioral', 'physiological', 'visual']
+    modalities=['tabular', 'timeseries', 'visual']
 )
 ```
 
@@ -336,7 +336,7 @@ from Preprocessing.OASIS import load_oasis_for_mainmodel
 Each dataset supports flexible modality selection:
 
 - **EuroSAT**: Choose from 5 spectral modalities
-- **MUTLA**: Choose from 3 modalities (behavioral, physiological, visual)
+- **MUTLA**: Choose from 3 modalities (tabular, timeseries, visual)
 - **OASIS**: Single tabular modality
 
 ### Training/Testing Splits

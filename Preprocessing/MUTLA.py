@@ -44,7 +44,7 @@ class EnhancedMUTLAPreprocessor:
     Addresses remaining concerns:
     - Proper EEG frequency analysis with dynamic sampling rate detection
     - Robust video ID mapping using actual file structure
-    - Real behavioral feature extraction from user records
+    - Real tabular feature extraction from user records
     """
     
     def __init__(self, raw_data_path: str = "Data/MUTLA", output_path: str = "ProcessedData/MUTLA"):
@@ -61,17 +61,17 @@ class EnhancedMUTLAPreprocessor:
         
         # Initialize data containers
         self.synced_data = None
-        self.behavioral_data = None
+        self.tabular_data = None
         self.physiological_data = None
         self.visual_data = None
         
         # Cache for file mappings to improve performance
         self._video_file_mapping_cache = {}
-        self._behavioral_data_cache = {}
+        self._tabular_data_cache = {}
         
     def _create_output_directories(self):
         """Create output directories for all 4 datasets"""
-        datasets = ['Complete', 'PerfectMultimodal', 'BehavioralPhysiological', 'BehavioralVisual']
+        datasets = ['Complete', 'PerfectMultimodal', 'TabularPhysiological', 'TabularVisual']
         
         for dataset in datasets:
             dataset_path = self.output_path / dataset
@@ -135,14 +135,14 @@ class EnhancedMUTLAPreprocessor:
         self.synced_data = combined_data
         return combined_data
     
-    def load_behavioral_data(self) -> pd.DataFrame:
+    def load_tabular_data(self) -> pd.DataFrame:
         """
-        Load and combine all behavioral data from user records
+        Load and combine all tabular data from user records
         
         Returns:
-            Combined behavioral data DataFrame
+            Combined tabular data DataFrame
         """
-        logger.info("Loading behavioral data...")
+        logger.info("Loading tabular data...")
         
         user_records_path = self.raw_data_path / "User records"
         if not user_records_path.exists():
@@ -160,7 +160,7 @@ class EnhancedMUTLAPreprocessor:
         
         subject_names = ['math', 'english', 'physics', 'chemistry', 'chinese', 'english_reading']
         
-        all_behavioral_data = []
+        all_tabular_data = []
         
         for file, subject in zip(subject_files, subject_names):
             file_path = user_records_path / file
@@ -184,20 +184,20 @@ class EnhancedMUTLAPreprocessor:
                 
                 # Add subject identifier
                 df['subject'] = subject
-                all_behavioral_data.append(df)
+                all_tabular_data.append(df)
                 logger.info(f"Loaded {len(df)} {subject} records")
             else:
                 logger.warning(f"File not found: {file_path}")
         
-        if not all_behavioral_data:
-            raise ValueError("No behavioral data files found")
+        if not all_tabular_data:
+            raise ValueError("No tabular data files found")
         
-        # Combine all behavioral data
-        combined_behavioral = pd.concat(all_behavioral_data, ignore_index=True)
+        # Combine all tabular data
+        combined_tabular = pd.concat(all_tabular_data, ignore_index=True)
         
-        logger.info(f"Total behavioral samples: {len(combined_behavioral)}")
-        self.behavioral_data = combined_behavioral
-        return combined_behavioral
+        logger.info(f"Total tabular samples: {len(combined_tabular)}")
+        self.tabular_data = combined_tabular
+        return combined_tabular
     
     def extract_physiological_features(self, synced_rows: pd.DataFrame, batch_size: int = 100) -> pd.DataFrame:
         """
@@ -1198,15 +1198,15 @@ class EnhancedMUTLAPreprocessor:
             sample_id = f"{row['school']}_{row['subject']}_{row['question_id']}_{row['user_id']}"
             
             # Check modality availability
-            behavioral_available = True  # All samples have behavioral data
+            tabular_available = True  # All samples have tabular data
             physiological_available = pd.notna(row.get('brainwave_file_path_attention', ''))
             visual_available = pd.notna(row.get('video_id', ''))
             
-            modality_count = sum([behavioral_available, physiological_available, visual_available])
+            modality_count = sum([tabular_available, physiological_available, visual_available])
             
             modality_availability.append({
                 'sample_id': sample_id,
-                'behavioral_available': behavioral_available,
+                'tabular_available': tabular_available,
                 'physiological_available': physiological_available,
                 'visual_available': visual_available,
                 'modality_count': modality_count
@@ -1230,7 +1230,7 @@ class EnhancedMUTLAPreprocessor:
         
         for idx, row in synced_rows.iterrows():
             # Create performance labels based on actual data
-            # Use response time and other behavioral indicators
+            # Use response time and other tabular indicators
             response_time = (row['ctime_parsed'] - row['stime_parsed']).total_seconds() if pd.notna(row['ctime_parsed']) and pd.notna(row['stime_parsed']) else 60.0
             
             # Performance score based on response time (shorter = better)
@@ -1257,41 +1257,41 @@ class EnhancedMUTLAPreprocessor:
         
         return labels_df
     
-    def create_behavioral_features_from_synced_data(self, synced_rows: pd.DataFrame) -> pd.DataFrame:
+    def create_tabular_features_from_synced_data(self, synced_rows: pd.DataFrame) -> pd.DataFrame:
         """
-        Create behavioral features from synced data rows using actual user records
+        Create tabular features from synced data rows using actual user records
         
         Args:
             synced_rows: DataFrame rows from synced data
             
         Returns:
-            DataFrame with behavioral features
+            DataFrame with tabular features
         """
-        logger.info("Creating behavioral features from synced data...")
+        logger.info("Creating tabular features from synced data...")
         
-        behavioral_features = []
+        tabular_features = []
         
         for idx, row in synced_rows.iterrows():
             # Calculate response time
             response_time = (row['ctime_parsed'] - row['stime_parsed']).total_seconds() if pd.notna(row['ctime_parsed']) and pd.notna(row['stime_parsed']) else 60.0
             
-            # Try to find matching behavioral data from user records
-            behavioral_data = self._find_matching_behavioral_data(row)
+            # Try to find matching tabular data from user records
+            tabular_data = self._find_matching_tabular_data(row)
             
-            # Create behavioral features based on actual data
+            # Create tabular features based on actual data
             features = {
                 'sample_id': row['sample_id'],
                 'response_time': response_time,
-                'difficulty_rating': behavioral_data.get('difficulty', 5.0),  # Default to medium difficulty
-                'hint_usage': behavioral_data.get('hint_usage', 0),
-                'answer_viewed': behavioral_data.get('answer_viewed', 0),
-                'analysis_viewed': behavioral_data.get('analysis_viewed', 0),
-                'mastery_level': behavioral_data.get('mastery_level', 0.5),
-                'proficiency_estimate': behavioral_data.get('proficiency', 0.5),
-                'is_correct': behavioral_data.get('is_correct', 0),
-                'user_answer': behavioral_data.get('user_answer', ''),
-                'right_answer': behavioral_data.get('right_answer', ''),
-                'cost_time': behavioral_data.get('cost_time', response_time),
+                'difficulty_rating': tabular_data.get('difficulty', 5.0),  # Default to medium difficulty
+                'hint_usage': tabular_data.get('hint_usage', 0),
+                'answer_viewed': tabular_data.get('answer_viewed', 0),
+                'analysis_viewed': tabular_data.get('analysis_viewed', 0),
+                'mastery_level': tabular_data.get('mastery_level', 0.5),
+                'proficiency_estimate': tabular_data.get('proficiency', 0.5),
+                'is_correct': tabular_data.get('is_correct', 0),
+                'user_answer': tabular_data.get('user_answer', ''),
+                'right_answer': tabular_data.get('right_answer', ''),
+                'cost_time': tabular_data.get('cost_time', response_time),
                 'subject_encoded': hash(row['subject']) % 10,
                 'school_encoded': 0 if row['school'] == 'schoolg' else 1,
                 'question_id': row['question_id'],
@@ -1300,34 +1300,34 @@ class EnhancedMUTLAPreprocessor:
                 'school': row['school']
             }
             
-            behavioral_features.append(features)
+            tabular_features.append(features)
         
-        behavioral_df = pd.DataFrame(behavioral_features)
-        logger.info(f"Created behavioral features for {len(behavioral_df)} samples")
+        tabular_df = pd.DataFrame(tabular_features)
+        logger.info(f"Created tabular features for {len(tabular_df)} samples")
         
-        return behavioral_df
+        return tabular_df
     
-    def _find_matching_behavioral_data(self, synced_row: pd.Series) -> Dict:
+    def _find_matching_tabular_data(self, synced_row: pd.Series) -> Dict:
         """
-        Find matching behavioral data from user records for a synced row
+        Find matching tabular data from user records for a synced row
         
         Args:
             synced_row: Single row from synced data
             
         Returns:
-            Dictionary with behavioral features
+            Dictionary with tabular features
         """
-        if self.behavioral_data is None:
+        if self.tabular_data is None:
             return {}
         
-        # Try to match by question_id and student_index (user_id in sync data maps to student_index in behavioral data)
+        # Try to match by question_id and student_index (user_id in sync data maps to student_index in tabular data)
         question_id = synced_row['question_id']
         user_id = synced_row['user_id']
         
         # Look for matching records
-        matching_records = self.behavioral_data[
-            (self.behavioral_data['question_id'] == question_id) &
-            (self.behavioral_data['student_index'] == user_id)
+        matching_records = self.tabular_data[
+            (self.tabular_data['question_id'] == question_id) &
+            (self.tabular_data['student_index'] == user_id)
         ]
         
         if len(matching_records) > 0:
@@ -1351,7 +1351,7 @@ class EnhancedMUTLAPreprocessor:
         
         if pd.notna(stime):
             # Look for records in the same subject around the same time
-            subject_records = self.behavioral_data[self.behavioral_data['subject'] == subject]
+            subject_records = self.tabular_data[self.tabular_data['subject'] == subject]
             if len(subject_records) > 0:
                 # Find closest time match
                 subject_records['time_diff'] = abs(pd.to_datetime(subject_records['stime'], errors='coerce') - stime)
@@ -1373,23 +1373,23 @@ class EnhancedMUTLAPreprocessor:
         # Final fallback: return empty dict (will use defaults)
         return {}
     
-    def create_behavioral_features(self, sample_ids: List[str]) -> pd.DataFrame:
+    def create_tabular_features(self, sample_ids: List[str]) -> pd.DataFrame:
         """
-        Create behavioral features for all samples using ONLY actual behavioral data
+        Create tabular features for all samples using ONLY actual tabular data
         
         Args:
             sample_ids: List of sample IDs
             
         Returns:
-            DataFrame with behavioral features
+            DataFrame with tabular features
         """
-        logger.info("Creating behavioral features from actual user records...")
+        logger.info("Creating tabular features from actual user records...")
         
-        if self.behavioral_data is None:
-            logger.error("No behavioral data loaded. Cannot create behavioral features.")
+        if self.tabular_data is None:
+            logger.error("No tabular data loaded. Cannot create tabular features.")
             return pd.DataFrame()
         
-        behavioral_features = []
+        tabular_features = []
         matched_count = 0
         unmatched_count = 0
         
@@ -1406,10 +1406,10 @@ class EnhancedMUTLAPreprocessor:
             question_id = parts[2]
             user_id = parts[3]
             
-            # Find matching behavioral record
-            matching_records = self.behavioral_data[
-                (self.behavioral_data['question_id'] == int(question_id)) &
-                (self.behavioral_data['student_index'] == int(user_id))
+            # Find matching tabular record
+            matching_records = self.tabular_data[
+                (self.tabular_data['question_id'] == int(question_id)) &
+                (self.tabular_data['student_index'] == int(user_id))
             ]
             
             if len(matching_records) > 0:
@@ -1431,21 +1431,21 @@ class EnhancedMUTLAPreprocessor:
                 }
                 matched_count += 1
             else:
-                # Skip samples without matching behavioral data instead of generating synthetic data
-                logger.debug(f"No behavioral data found for sample {sample_id}")
+                # Skip samples without matching tabular data instead of generating synthetic data
+                logger.debug(f"No tabular data found for sample {sample_id}")
                 unmatched_count += 1
                 continue
             
-            behavioral_features.append(features)
+            tabular_features.append(features)
         
-        behavioral_df = pd.DataFrame(behavioral_features)
-        logger.info(f"Created behavioral features for {len(behavioral_df)} samples")
+        tabular_df = pd.DataFrame(tabular_features)
+        logger.info(f"Created tabular features for {len(tabular_df)} samples")
         logger.info(f"Matched: {matched_count}, Unmatched: {unmatched_count}")
         
         if unmatched_count > 0:
-            logger.warning(f"Skipped {unmatched_count} samples due to missing behavioral data")
+            logger.warning(f"Skipped {unmatched_count} samples due to missing tabular data")
         
-        return behavioral_df
+        return tabular_df
     
     def create_metadata(self, dataset_name: str, sample_count: int, modalities: List[str]) -> Dict:
         """
@@ -1470,7 +1470,7 @@ class EnhancedMUTLAPreprocessor:
                 'preprocessing_version': '1.0'
             },
             'feature_info': {
-                'behavioral_features': [
+                'tabular_features': [
                     'response_time', 'difficulty_rating', 'hint_usage',
                     'answer_viewed', 'analysis_viewed', 'mastery_level',
                     'proficiency_estimate', 'subject_encoded', 'school_encoded'
@@ -1502,7 +1502,7 @@ class EnhancedMUTLAPreprocessor:
         
         # Load data
         self.load_synchronized_data()
-        self.load_behavioral_data()
+        self.load_tabular_data()
         
         # Use all synced data
         all_samples = self.synced_data.copy()
@@ -1511,7 +1511,7 @@ class EnhancedMUTLAPreprocessor:
         
         # Create features and labels using actual data
         labels_df = self.create_labels_from_synced_data(all_samples)
-        behavioral_df = self.create_behavioral_features_from_synced_data(all_samples)
+        tabular_df = self.create_tabular_features_from_synced_data(all_samples)
         
         # Extract physiological features (only for samples with brainwave data)
         physio_samples = all_samples[all_samples['brainwave_file_path_attention'].notna()]
@@ -1528,13 +1528,13 @@ class EnhancedMUTLAPreprocessor:
         metadata = self.create_metadata(
             'MUTLA_Complete_Mixed_Modality',
             len(all_samples),
-            ['behavioral', 'physiological', 'visual']
+            ['tabular', 'physiological', 'visual']
         )
         
         # Save data
         output_dir = self.output_path / 'Complete'
         labels_df.to_csv(output_dir / 'labels.csv', index=False)
-        behavioral_df.to_csv(output_dir / 'behavioral_features.csv', index=False)
+        tabular_df.to_csv(output_dir / 'tabular_features.csv', index=False)
         physiological_df.to_csv(output_dir / 'physiological_features.csv', index=False)
         visual_df.to_csv(output_dir / 'visual_features.csv', index=False)
         modality_availability_df.to_csv(output_dir / 'modality_availability.csv', index=False)
@@ -1551,7 +1551,7 @@ class EnhancedMUTLAPreprocessor:
         
         # Load data
         self.load_synchronized_data()
-        self.load_behavioral_data()
+        self.load_tabular_data()
         
         # Find samples with all 3 modalities
         perfect_samples = self.synced_data[
@@ -1571,13 +1571,13 @@ class EnhancedMUTLAPreprocessor:
         metadata = self.create_metadata(
             'MUTLA_Perfect_Multimodal',
             len(perfect_samples),
-            ['behavioral', 'physiological', 'visual']
+            ['tabular', 'physiological', 'visual']
         )
         
         # Save data
         output_dir = self.output_path / 'PerfectMultimodal'
         labels_df.to_csv(output_dir / 'labels.csv', index=False)
-        behavioral_df.to_csv(output_dir / 'behavioral_features.csv', index=False)
+        tabular_df.to_csv(output_dir / 'tabular_features.csv', index=False)
         physiological_df.to_csv(output_dir / 'physiological_features.csv', index=False)
         visual_df.to_csv(output_dir / 'visual_features.csv', index=False)
         
@@ -1587,13 +1587,13 @@ class EnhancedMUTLAPreprocessor:
         logger.info(f"Dataset 2 saved to: {output_dir}")
         return labels_df, behavioral_df, physiological_df, visual_df, metadata
     
-    def preprocess_dataset_3_behavioral_physiological(self):
-        """Preprocess Dataset 3: Behavioral + Physiological (2,981 samples)"""
-        logger.info("Preprocessing Dataset 3: Behavioral + Physiological")
+    def preprocess_dataset_3_tabular_physiological(self):
+        """Preprocess Dataset 3: Tabular + Physiological (2,981 samples)"""
+        logger.info("Preprocessing Dataset 3: Tabular + Physiological")
         
         # Load data
         self.load_synchronized_data()
-        self.load_behavioral_data()
+        self.load_tabular_data()
         
         # Find samples with behavioral and physiological data
         physio_samples = self.synced_data[
@@ -1617,7 +1617,7 @@ class EnhancedMUTLAPreprocessor:
         # Save data
         output_dir = self.output_path / 'BehavioralPhysiological'
         labels_df.to_csv(output_dir / 'labels.csv', index=False)
-        behavioral_df.to_csv(output_dir / 'behavioral_features.csv', index=False)
+        tabular_df.to_csv(output_dir / 'tabular_features.csv', index=False)
         physiological_df.to_csv(output_dir / 'physiological_features.csv', index=False)
         
         with open(output_dir / 'metadata.json', 'w') as f:
@@ -1626,13 +1626,13 @@ class EnhancedMUTLAPreprocessor:
         logger.info(f"Dataset 3 saved to: {output_dir}")
         return labels_df, behavioral_df, physiological_df, metadata
     
-    def preprocess_dataset_4_behavioral_visual(self):
-        """Preprocess Dataset 4: Behavioral + Visual (3,612 samples)"""
-        logger.info("Preprocessing Dataset 4: Behavioral + Visual")
+    def preprocess_dataset_4_tabular_visual(self):
+        """Preprocess Dataset 4: Tabular + Visual (3,612 samples)"""
+        logger.info("Preprocessing Dataset 4: Tabular + Visual")
         
         # Load data
         self.load_synchronized_data()
-        self.load_behavioral_data()
+        self.load_tabular_data()
         
         # Find samples with behavioral and visual data
         visual_samples = self.synced_data[
@@ -1656,7 +1656,7 @@ class EnhancedMUTLAPreprocessor:
         # Save data
         output_dir = self.output_path / 'BehavioralVisual'
         labels_df.to_csv(output_dir / 'labels.csv', index=False)
-        behavioral_df.to_csv(output_dir / 'behavioral_features.csv', index=False)
+        tabular_df.to_csv(output_dir / 'tabular_features.csv', index=False)
         visual_df.to_csv(output_dir / 'visual_features.csv', index=False)
         
         with open(output_dir / 'metadata.json', 'w') as f:
@@ -1754,13 +1754,13 @@ class EnhancedMUTLAPreprocessor:
                     else:
                         validation_results['errors'].append(f"Missing sync file: {name}")
             
-            # Validate behavioral data files
-            behavioral_path = self.raw_data_path / 'User records'
-            if behavioral_path.exists():
-                behavioral_files = list(behavioral_path.glob('*.csv'))
-                validation_results['file_counts']['behavioral_files'] = len(behavioral_files)
+            # Validate tabular data files
+            tabular_path = self.raw_data_path / 'User records'
+            if tabular_path.exists():
+                tabular_files = list(tabular_path.glob('*.csv'))
+                validation_results['file_counts']['tabular_files'] = len(tabular_files)
                 
-                for file_path in behavioral_files:
+                for file_path in tabular_files:
                     try:
                         # Test file readability with multiple encodings (same as actual loading)
                         df = None
@@ -1774,9 +1774,9 @@ class EnhancedMUTLAPreprocessor:
                                 continue
                         
                         if df is None:
-                            validation_results['errors'].append(f"Unreadable behavioral file: {file_path.name}")
+                            validation_results['errors'].append(f"Unreadable tabular file: {file_path.name}")
                         elif len(df) == 0:
-                            validation_results['warnings'].append(f"Empty behavioral file: {file_path.name}")
+                            validation_results['warnings'].append(f"Empty tabular file: {file_path.name}")
                     except Exception as e:
                         validation_results['errors'].append(f"Error reading {file_path.name}: {e}")
             
@@ -1840,7 +1840,7 @@ class EnhancedMUTLAPreprocessor:
             
             # Load data
             self.load_synchronized_data()
-            self.load_behavioral_data()
+            self.load_tabular_data()
             
             # Validate sample counts
             validation_results = self.validate_sample_counts()
@@ -1895,7 +1895,7 @@ def validate_mutla_preprocessing():
         base_path = Path("ProcessedData/MUTLA")
         
         # Check if all dataset directories exist
-        datasets = ['Complete', 'PerfectMultimodal', 'BehavioralPhysiological', 'BehavioralVisual']
+        datasets = ['Complete', 'PerfectMultimodal', 'TabularPhysiological', 'TabularVisual']
         
         for dataset in datasets:
             dataset_path = base_path / dataset
@@ -1904,7 +1904,7 @@ def validate_mutla_preprocessing():
                 return False
             
             # Check required files
-            required_files = ['labels.csv', 'behavioral_features.csv', 'metadata.json']
+            required_files = ['labels.csv', 'tabular_features.csv', 'metadata.json']
             
             if dataset in ['Complete']:
                 required_files.extend(['physiological_features.csv', 'visual_features.csv', 'modality_availability.csv'])
@@ -1943,14 +1943,14 @@ def load_mutla_complete_for_mainmodel():
     base_path = Path("ProcessedData/MUTLA/Complete")
     
     # Load all features
-    behavioral_df = pd.read_csv(base_path / 'behavioral_features.csv')
+    tabular_df = pd.read_csv(base_path / 'tabular_features.csv')
     physiological_df = pd.read_csv(base_path / 'physiological_features.csv')
     visual_df = pd.read_csv(base_path / 'visual_features.csv')
     labels_df = pd.read_csv(base_path / 'labels.csv')
     modality_df = pd.read_csv(base_path / 'modality_availability.csv')
     
     return {
-        'behavioral': behavioral_df,
+        'tabular': tabular_df,
         'physiological': physiological_df,
         'visual': visual_df,
         'labels': labels_df,
@@ -1967,54 +1967,54 @@ def load_mutla_perfect_for_mainmodel():
     base_path = Path("ProcessedData/MUTLA/PerfectMultimodal")
     
     # Load all features (all samples have all modalities)
-    behavioral_df = pd.read_csv(base_path / 'behavioral_features.csv')
+    tabular_df = pd.read_csv(base_path / 'tabular_features.csv')
     physiological_df = pd.read_csv(base_path / 'physiological_features.csv')
     visual_df = pd.read_csv(base_path / 'visual_features.csv')
     labels_df = pd.read_csv(base_path / 'labels.csv')
     
     return {
-        'behavioral': behavioral_df,
+        'tabular': tabular_df,
         'physiological': physiological_df,
         'visual': visual_df,
         'labels': labels_df
     }
 
 
-def load_mutla_behavioral_physiological_for_mainmodel():
+def load_mutla_tabular_physiological_for_mainmodel():
     """
-    Load MUTLA dataset with behavioral and physiological modalities
+    Load MUTLA dataset with tabular and physiological modalities
     """
     import pandas as pd
     
-    base_path = Path("ProcessedData/MUTLA/BehavioralPhysiological")
+    base_path = Path("ProcessedData/MUTLA/TabularPhysiological")
     
     # Load features (missing visual modality)
-    behavioral_df = pd.read_csv(base_path / 'behavioral_features.csv')
+    tabular_df = pd.read_csv(base_path / 'tabular_features.csv')
     physiological_df = pd.read_csv(base_path / 'physiological_features.csv')
     labels_df = pd.read_csv(base_path / 'labels.csv')
     
     return {
-        'behavioral': behavioral_df,
+        'tabular': tabular_df,
         'physiological': physiological_df,
         'labels': labels_df
     }
 
 
-def load_mutla_behavioral_visual_for_mainmodel():
+def load_mutla_tabular_visual_for_mainmodel():
     """
-    Load MUTLA dataset with behavioral and visual modalities
+    Load MUTLA dataset with tabular and visual modalities
     """
     import pandas as pd
     
-    base_path = Path("ProcessedData/MUTLA/BehavioralVisual")
+    base_path = Path("ProcessedData/MUTLA/TabularVisual")
     
     # Load features (missing physiological modality)
-    behavioral_df = pd.read_csv(base_path / 'behavioral_features.csv')
+    tabular_df = pd.read_csv(base_path / 'tabular_features.csv')
     visual_df = pd.read_csv(base_path / 'visual_features.csv')
     labels_df = pd.read_csv(base_path / 'labels.csv')
     
     return {
-        'behavioral': behavioral_df,
+        'tabular': tabular_df,
         'visual': visual_df,
         'labels': labels_df
     }
