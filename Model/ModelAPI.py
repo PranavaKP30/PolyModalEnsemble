@@ -18,6 +18,12 @@ from pathlib import Path
 import numpy as np
 import torch
 
+# Import Error Handler
+try:
+    from .ErrorHandler import global_error_handler, handle_pipeline_error, register_rollback, save_stage_state, PipelineError
+except ImportError:
+    from ErrorHandler import global_error_handler, handle_pipeline_error, register_rollback, save_stage_state, PipelineError
+
 # Import Stage 1: DataIntegration
 try:
     from .DataIntegration import SimpleDataLoader, load_eurosat_data, load_oasis_data, load_mutla_data, load_custom_data
@@ -1119,6 +1125,8 @@ class ModelAPI:
         5. All Stage 3 API methods (learner selection, tests, etc.)
         6. prepare_for_stage4()
         
+        Includes comprehensive error handling and rollback mechanisms.
+        
         Parameters
         ----------
         **kwargs
@@ -1194,50 +1202,68 @@ class ModelAPI:
         # ============================================================================
         logger.info("=== STAGE 1: DATA INTEGRATION ===")
         
-        # Extract Stage 1 parameters
-        dataset = kwargs.get('dataset', 'eurosat')
-        data_dir = kwargs.get('data_dir', 'ProcessedData/EuroSAT')
-        test_size = kwargs.get('test_size', 0.2)
-        fast_mode = kwargs.get('fast_mode', True)
-        max_samples = kwargs.get('max_samples', 1000)
-        random_state = kwargs.get('random_state', 42)
-        
-        # Load dataset based on parameter
-        if dataset.lower() == 'eurosat':
-            self.load_eurosat_data(
-                data_dir=data_dir,
-                test_size=test_size,
-                fast_mode=fast_mode,
-                max_samples=max_samples,
-                random_state=random_state
-            )
-        elif dataset.lower() == 'oasis':
-            self.load_oasis_data(
-                data_dir=data_dir,
-                test_size=test_size,
-                fast_mode=fast_mode,
-                max_samples=max_samples,
-                random_state=random_state
-            )
-        elif dataset.lower() == 'mutla':
-            self.load_mutla_data(
-                data_dir=data_dir,
-                test_size=test_size,
-                fast_mode=fast_mode,
-                max_samples=max_samples,
-                random_state=random_state
-            )
-        else:
-            raise ValueError(f"Unsupported dataset: {dataset}")
-        
-        # Stage 1: Data validation and consistency checks
-        data_info = self.get_data_info()
-        logger.info(f"Stage 1: Loaded {data_info['n_train']} train, {data_info['n_test']} test samples")
-        logger.info(f"Stage 1: Modalities: {data_info['modalities']}")
-        
-        # Validate data consistency
-        if not self.validate_data_consistency():
-            raise ValueError("Stage 1: Data consistency validation failed")
+        try:
+            # Save initial state for rollback
+            save_stage_state("stage1_start", {"kwargs": kwargs})
+            
+            # Extract Stage 1 parameters
+            dataset = kwargs.get('dataset', 'eurosat')
+            data_dir = kwargs.get('data_dir', 'ProcessedData/EuroSAT')
+            test_size = kwargs.get('test_size', 0.2)
+            fast_mode = kwargs.get('fast_mode', True)
+            max_samples = kwargs.get('max_samples', 1000)
+            random_state = kwargs.get('random_state', 42)
+            
+            # Register rollback action for Stage 1
+            register_rollback(lambda: self._rollback_stage1(), "Rollback Stage 1 data loading")
+            
+            # Load dataset based on parameter
+            if dataset.lower() == 'eurosat':
+                self.load_eurosat_data(
+                    data_dir=data_dir,
+                    test_size=test_size,
+                    fast_mode=fast_mode,
+                    max_samples=max_samples,
+                    random_state=random_state
+                )
+            elif dataset.lower() == 'oasis':
+                self.load_oasis_data(
+                    data_dir=data_dir,
+                    test_size=test_size,
+                    fast_mode=fast_mode,
+                    max_samples=max_samples,
+                    random_state=random_state
+                )
+            elif dataset.lower() == 'mutla':
+                self.load_mutla_data(
+                    data_dir=data_dir,
+                    test_size=test_size,
+                    fast_mode=fast_mode,
+                    max_samples=max_samples,
+                    random_state=random_state
+                )
+            else:
+                raise ValueError(f"Unsupported dataset: {dataset}")
+            
+            # Stage 1: Data validation and consistency checks
+            data_info = self.get_data_info()
+            logger.info(f"Stage 1: Loaded {data_info['n_train']} train, {data_info['n_test']} test samples")
+            logger.info(f"Stage 1: Modalities: {data_info['modalities']}")
+            
+            # Validate data consistency
+            if not self.validate_data_consistency():
+                raise ValueError("Stage 1: Data consistency validation failed")
+            
+            # Save successful Stage 1 state
+            save_stage_state("stage1_complete", {"data_info": data_info})
+            
+        except Exception as e:
+            error_info = handle_pipeline_error(e, "stage1", {"dataset": dataset, "data_dir": data_dir})
+            if not error_info.recoverable:
+                raise PipelineError(f"Stage 1 failed: {e}", stage="stage1")
+            else:
+                logger.warning(f"Stage 1 error recovered: {e}")
+                # Continue with degraded functionality
         
         logger.info("✅ Stage 1: DataIntegration completed")
         
@@ -1558,51 +1584,62 @@ class ModelAPI:
 
 
     # ============================================================================
+    # ERROR HANDLING AND ROLLBACK METHODS
+    # ============================================================================
+
+    def _rollback_stage1(self):
+        """Rollback Stage 1 operations."""
+        try:
+            logger.info("Rolling back Stage 1: DataIntegration")
+            # Clear data loader and reset state
+            self.data_loader = None
+            self.current_data = {}
+            logger.info("Stage 1 rollback completed")
+        except Exception as e:
+            logger.error(f"Stage 1 rollback failed: {e}")
+    
+    def _rollback_stage2(self):
+        """Rollback Stage 2 operations."""
+        try:
+            logger.info("Rolling back Stage 2: BagGeneration")
+            # Clear bag generator and reset state
+            self.bag_generator = None
+            self.bags = []
+            logger.info("Stage 2 rollback completed")
+        except Exception as e:
+            logger.error(f"Stage 2 rollback failed: {e}")
+    
+    def _rollback_stage3(self):
+        """Rollback Stage 3 operations."""
+        try:
+            logger.info("Rolling back Stage 3: BagLearnerParing")
+            # Clear learner selector and reset state
+            self.learner_selector = None
+            self.learner_configs = {}
+            logger.info("Stage 3 rollback completed")
+        except Exception as e:
+            logger.error(f"Stage 3 rollback failed: {e}")
+    
+    def _rollback_stage4(self):
+        """Rollback Stage 4 operations."""
+        try:
+            logger.info("Rolling back Stage 4: BagTraining")
+            # Clear trained models and reset state
+            self.trained_models = {}
+            self.training_metrics = {}
+            logger.info("Stage 4 rollback completed")
+        except Exception as e:
+            logger.error(f"Stage 4 rollback failed: {e}")
+    
+    def get_error_summary(self) -> Dict[str, Any]:
+        """Get error summary from the global error handler."""
+        return global_error_handler.get_error_summary()
+    
+    def is_pipeline_healthy(self) -> bool:
+        """Check if pipeline is in a healthy state."""
+        return global_error_handler.is_pipeline_healthy()
+
+    # ============================================================================
     # End of API
     # ============================================================================
 
-"""
-IMPLEMENTATION STATUS:
-=====================
-
-Stage 1: DataIntegration - COMPLETE
-   - SimpleDataLoader class implemented
-   - All dataset loaders (EuroSAT, OASIS, MUTLA, Custom) working
-   - API wrapper integrated with method chaining
-   - Data validation and consistency checks
-   - Memory efficiency features (lazy loading, chunking)
-
-Stage 2: BagGeneration - COMPLETE
-   - BagGeneration class implemented and integrated
-   - Adaptive modality dropout strategy
-   - Ensemble bag generation with bootstrap sampling
-   - Interpretability and robustness tests
-   - API wrapper integrated with method chaining
-
-Stage 3: BaseLearnerSelector - COMPLETE ✅
-   - BaseLearnerSelector class fully implemented
-   - Performance-based learner selection with actual optimization
-   - Modality-specific learner optimization with grid search
-   - Ensemble diversity metrics and comprehensive testing
-
-Stage 4: trainingPipeline - TODO
-   - TrainingPipeline class needs implementation
-   - Unified training across modalities
-   - Loss function design for multimodal ensembles
-   - Hyperparameter optimization
-
-Stage 5: ensemblePrediction - TODO
-   - EnsemblePrediction class needs implementation
-   - Prediction aggregation strategies
-   - Uncertainty quantification
-   - Model interpretation and explainability
-
-NEXT STEPS:
-===========
-1. ✅ Implement Stage 2: BagGeneration - COMPLETED
-2. ✅ Update API imports and method implementations - COMPLETED
-3. ✅ Test Stage 1 → Stage 2 integration - COMPLETED
-4. ✅ Implement Stage 3: BaseLearnerSelector - COMPLETED
-5. Continue with Stage 4, 5 in sequence
-6. Add comprehensive testing for full pipeline
-"""

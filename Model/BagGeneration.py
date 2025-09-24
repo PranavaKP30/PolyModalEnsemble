@@ -22,6 +22,20 @@ from sklearn.preprocessing import StandardScaler
 
 logger = logging.getLogger("bag_generation")
 
+# Configuration Constants
+class BagGenerationConfig:
+    """Configuration constants for BagGeneration."""
+    MAX_DROPOUT_RATE = 0.8
+    MIN_MODALITIES = 1
+    DEFAULT_SAMPLE_RATIO = 0.8
+    DEFAULT_N_BAGS = 20
+    DEFAULT_RANDOM_STATE = 42
+    
+    # Memory optimization constants
+    MAX_SAMPLES_FOR_CV = 1000  # Limit samples for cross-validation
+    MAX_FEATURES_FOR_REDUNDANCY = 100  # Limit features for redundancy calculation
+    MEMORY_WARNING_THRESHOLD = 500 * 1024 * 1024  # 500MB warning threshold
+
 # --- BagConfig ---
 @dataclass
 class BagConfig:
@@ -173,8 +187,6 @@ class BagGeneration:
         # Validate dropout strategy parameters
         if self.dropout_strategy == 'adaptive' and self.n_modalities < 2:
             logger.warning("Adaptive strategy with single modality may not provide meaningful diversity")
-        
-        
         logger.info("Data consistency validation completed")
 
     def generate_bags(self) -> List[BagConfig]:
@@ -191,10 +203,11 @@ class BagGeneration:
         # Step 1: Initialize bag creation
         self._initialize_bags()
         
-        # Step 2: Dropout Strategy Calculation
-        dropout_rates = self._calculate_dropout_rates()
+        # Step 2: Calculate Modality Importance
+        self._calculate_modality_importance()
         
-        # Step 3: Modality Mask Creation
+        # Step 3: Generate Bag Configurations
+        dropout_rates = self._calculate_dropout_rates()
         modality_masks = self._create_modality_masks(dropout_rates)
         
         # Step 4: Sampling (Bootstrap)
@@ -203,8 +216,8 @@ class BagGeneration:
         # Step 5: Bag Data Extraction and Storage
         self._extract_and_store_bag_data(modality_masks, data_indices, dropout_rates)
         
-        # Step 6: Collect interpretability data
-        self._collect_interpretability_data()
+        # Step 6: Initialize interpretability data storage
+        self._interpretability_data = {}
         
         logger.info(f"Successfully generated {len(self.bags)} bags")
         return self.bags
@@ -230,12 +243,55 @@ class BagGeneration:
         logger.info(f"Initialized {self.n_bags} empty bags for {self.n_modalities} modalities")
 
     # ============================================================================
-    # STEP 2: DROPOUT STRATEGY CALCULATION
+    # STEP 2: CALCULATE MODALITY IMPORTANCE
+    # ============================================================================
+    
+    def _calculate_modality_importance(self):
+        """Step 2: Calculate Modality Importance using 6-factor analysis."""
+        logger.info("Step 2: Calculating modality importance using 6-factor analysis")
+        
+        if self.dropout_strategy == 'adaptive':
+            # For adaptive strategy, calculate 6-factor importance
+            self.modality_importance = {}
+            
+            for modality_name, data in self.train_data.items():
+                try:
+                    # Calculate 6-factor importance for this modality
+                    importance = self._calculate_6_factor_importance(data, modality_name)
+                    self.modality_importance[modality_name] = importance
+                    
+                except Exception as e:
+                    logger.warning(f"Error calculating 6-factor importance for {modality_name}: {e}")
+                    # Fallback to simple variance-based importance
+                    data_normalized = self._normalize_for_importance(data)
+                    
+                    if data_normalized.ndim > 1:
+                        variance = float(np.mean(np.var(data_normalized, axis=0)))
+                    else:
+                        variance = float(np.var(data_normalized))
+                    
+                    feature_count = data.shape[1] if data.ndim > 1 else 1
+                    feature_factor = np.log(feature_count + 1)
+                    
+                    importance = variance * feature_factor
+                    self.modality_importance[modality_name] = importance
+            
+            # Log 6-factor importance scores
+            logger.info("6-Factor importance scores:")
+            for name, score in sorted(self.modality_importance.items(), key=lambda x: x[1], reverse=True):
+                logger.info(f"  {name}: {score:.4f}")
+        else:
+            # For non-adaptive strategies, set equal importance
+            self.modality_importance = {name: 1.0 for name in self.modality_names}
+            logger.info("Non-adaptive strategy: Using equal importance for all modalities")
+
+    # ============================================================================
+    # STEP 3: GENERATE BAG CONFIGURATIONS
     # ============================================================================
     
     def _calculate_dropout_rates(self) -> np.ndarray:
-        """Step 2: Dropout Strategy Calculation."""
-        logger.info(f"Step 2: Calculating dropout rates using {self.dropout_strategy} strategy")
+        """Step 3: Calculate dropout rates based on strategy."""
+        logger.info(f"Step 3: Calculating dropout rates using {self.dropout_strategy} strategy")
         
         if self.dropout_strategy == 'linear':
             return self._linear_strategy()
@@ -262,41 +318,20 @@ class BagGeneration:
 
     def _adaptive_strategy(self) -> np.ndarray:
         """
-        Adaptive strategy: modality-based dropout.
-        - Computes modality importance scores using variance-based analysis
+        Adaptive strategy: modality-based dropout using pre-calculated importance scores.
+        - Uses pre-calculated 6-factor importance scores from Step 2
         - Normalizes to dropout probabilities (higher importance = lower dropout)
         - Ensures distinct modality combinations
         - Enforces minimum modality constraints
         """
-        logger.info("Computing modality importance scores for adaptive strategy")
+        logger.info("Using pre-calculated 6-factor importance scores for adaptive strategy")
         
-        # Compute sophisticated modality importance scores
-        self.modality_importance = {}
-        
-        for modality_name, data in self.train_data.items():
-            try:
-                # Calculate predictive power for this modality
-                predictive_power = self._calculate_predictive_power(data, modality_name)
-                self.modality_importance[modality_name] = predictive_power
-                
-            except Exception as e:
-                logger.warning(f"Error calculating predictive power for {modality_name}: {e}")
-                # Fallback to variance-based importance
-                data_normalized = self._normalize_for_importance(data)
-                
-                if data_normalized.ndim > 1:
-                    variance = float(np.mean(np.var(data_normalized, axis=0)))
-                else:
-                    variance = float(np.var(data_normalized))
-                
-                feature_count = data.shape[1] if data.ndim > 1 else 1
-                feature_factor = np.log(feature_count + 1)
-                
-                importance = variance * feature_factor
-                self.modality_importance[modality_name] = importance
+        # Use already calculated importance from Step 2
+        if not self.modality_importance:
+            raise ValueError("Modality importance must be calculated first in Step 2")
         
         # Log predictive power scores
-        logger.info("Predictive power scores:")
+        logger.info("Using 6-factor importance scores from Step 2:")
         for name, score in sorted(self.modality_importance.items(), key=lambda x: x[1], reverse=True):
             logger.info(f"  {name}: {score:.4f}")
         
@@ -371,6 +406,102 @@ class BagGeneration:
         logger.info(f"Generated {len(dropout_rates)} adaptive dropout rates with {len(used_combinations)} distinct combinations")
         return np.array(dropout_rates)
 
+    def _calculate_6_factor_importance(self, modality_data: np.ndarray, modality_name: str) -> float:
+        """
+        Calculate sophisticated 6-factor importance score for a modality.
+        
+        The 6 factors are:
+        1. Data Variance - Informativeness of the data
+        2. Feature Count - Number of features (log-scaled)
+        3. Label Correlation - Correlation with target labels
+        4. Cross-Modality Redundancy - Uniqueness compared to other modalities
+        5. Data Quality - Completeness, consistency, and noise levels
+        6. Predictive Power - Cross-validation performance
+        
+        Parameters
+        ----------
+        modality_data : np.ndarray
+            Data for the modality
+        modality_name : str
+            Name of the modality
+            
+        Returns
+        -------
+        float
+            Combined 6-factor importance score (higher = more important)
+        """
+        try:
+            # Optimization for large datasets: Use sampling for expensive computations
+            n_samples = len(modality_data)
+            max_samples_for_cv = BagGenerationConfig.MAX_SAMPLES_FOR_CV
+            
+            if n_samples > max_samples_for_cv:
+                # Sample data for expensive computations
+                sample_indices = self._rng.choice(n_samples, max_samples_for_cv, replace=False)
+                sampled_data = modality_data[sample_indices]
+                sampled_labels = self.train_labels[sample_indices]
+                logger.debug(f"Using {max_samples_for_cv} samples for 6-factor calculation on {modality_name} (total: {n_samples})")
+            else:
+                sampled_data = modality_data
+                sampled_labels = self.train_labels
+            
+            # Normalize data for fair comparison
+            data_normalized = self._normalize_for_importance(sampled_data)
+            
+            # Factor 1: Data Variance (informativeness)
+            variance_score = self._compute_data_variance(modality_data)
+            
+            # Factor 2: Feature Count (log-scaled)
+            feature_count = modality_data.shape[1] if modality_data.ndim > 1 else 1
+            feature_factor = np.log(feature_count + 1) / 10.0  # Scale down
+            
+            # Factor 3: Label Correlation (intelligence component)
+            correlation_score = self._compute_label_correlation(data_normalized, sampled_labels)
+            
+            # Factor 4: Cross-Modality Redundancy (distinctiveness)
+            redundancy_score = self._compute_cross_modality_redundancy(data_normalized, modality_name)
+            
+            # Factor 5: Data Quality (completeness, consistency, noise)
+            quality_score = self._assess_data_quality(data_normalized)
+            
+            # Factor 6: Predictive Power (CV performance) - use sampled data for efficiency
+            predictive_power = self._calculate_predictive_power(sampled_data, modality_name, sampled_labels)
+            
+            # Combine all 6 factors with weighted importance
+            # Weights: variance(0.25), features(0.15), correlation(0.20), 
+            #         redundancy(0.15), quality(0.10), predictive(0.15)
+            combined_score = (
+                0.25 * variance_score +
+                0.15 * feature_factor +
+                0.20 * correlation_score +
+                0.15 * (1.0 - redundancy_score) +  # Invert redundancy (less redundant = more important)
+                0.10 * quality_score +
+                0.15 * predictive_power
+            )
+            
+            # Ensure score is in reasonable range [0.01, 1.0]
+            combined_score = max(0.01, min(1.0, combined_score))
+            
+            logger.debug(f"6-Factor scores for {modality_name}: "
+                        f"variance={variance_score:.3f}, features={feature_factor:.3f}, "
+                        f"correlation={correlation_score:.3f}, redundancy={redundancy_score:.3f}, "
+                        f"quality={quality_score:.3f}, predictive={predictive_power:.3f}, "
+                        f"combined={combined_score:.3f}")
+            
+            return float(combined_score)
+            
+        except Exception as e:
+            logger.warning(f"Error in 6-factor importance calculation for {modality_name}: {e}")
+            # Fallback to simple variance-based importance
+            data_normalized = self._normalize_for_importance(modality_data)
+            if data_normalized.ndim > 1:
+                variance = float(np.mean(np.var(data_normalized, axis=0)))
+            else:
+                variance = float(np.var(data_normalized))
+            feature_count = modality_data.shape[1] if modality_data.ndim > 1 else 1
+            feature_factor = np.log(feature_count + 1)
+            return max(0.01, variance * feature_factor / 10.0)
+
     # adaptive strategy functions
     def _normalize_for_importance(self, data: np.ndarray) -> np.ndarray:
         """
@@ -397,11 +528,14 @@ class BagGeneration:
         else:
             return np.zeros_like(data)
     
-    def _compute_label_correlation(self, data_normalized: np.ndarray) -> float:
+    def _compute_label_correlation(self, data_normalized: np.ndarray, labels: np.ndarray = None) -> float:
         """
         Compute correlation between modality data and labels (intelligence component).
         """
         try:
+            if labels is None:
+                labels = self.train_labels
+                
             # Flatten multi-dimensional data for correlation calculation
             if data_normalized.ndim > 2:
                 # Runtime check: Ensure first dimension is samples
@@ -415,7 +549,7 @@ class BagGeneration:
             # Calculate correlation with labels for each feature
             correlations = []
             for i in range(data_flat.shape[1]):
-                corr = np.corrcoef(data_flat[:, i], self.train_labels)[0, 1]
+                corr = np.corrcoef(data_flat[:, i], labels)[0, 1]
                 if not np.isnan(corr):
                     correlations.append(abs(corr))  # Use absolute correlation
             
@@ -510,7 +644,7 @@ class BagGeneration:
             # Fallback to moderate quality if assessment fails
             return 0.7
     
-    def _calculate_predictive_power(self, modality_data: np.ndarray, modality_name: str) -> float:
+    def _calculate_predictive_power(self, modality_data: np.ndarray, modality_name: str, labels: np.ndarray = None) -> float:
         """
         Calculate predictive power of a modality using simplified assessment.
         
@@ -527,8 +661,9 @@ class BagGeneration:
             Predictive power score (higher = more predictive)
         """
         try:
-            # Get labels for this modality
-            labels = self.train_labels
+            # Use provided labels or fall back to train labels
+            if labels is None:
+                labels = self.train_labels
             
             # Ensure we have valid data
             if modality_data.size == 0 or len(labels) == 0:
@@ -562,9 +697,6 @@ class BagGeneration:
     def _quick_cv_score(self, modality_data: np.ndarray, labels: np.ndarray) -> float:
         """Quick cross-validation score using a simple classifier."""
         try:
-            from sklearn.ensemble import RandomForestClassifier
-            from sklearn.model_selection import cross_val_score
-            from sklearn.preprocessing import StandardScaler
             
             # Handle different data shapes
             if modality_data.ndim > 2:
@@ -595,8 +727,6 @@ class BagGeneration:
     def _compute_feature_importance(self, modality_data: np.ndarray, labels: np.ndarray) -> float:
         """Compute feature importance using a quick model."""
         try:
-            from sklearn.ensemble import RandomForestClassifier
-            from sklearn.preprocessing import StandardScaler
             
             # Handle different data shapes
             if modality_data.ndim > 2:
@@ -628,8 +758,6 @@ class BagGeneration:
     def _compute_importance_stability(self, modality_data: np.ndarray, labels: np.ndarray) -> float:
         """Compute stability of importance across different samples."""
         try:
-            from sklearn.ensemble import RandomForestClassifier
-            from sklearn.preprocessing import StandardScaler
             
             # Handle different data shapes
             if modality_data.ndim > 2:
@@ -700,7 +828,7 @@ class BagGeneration:
             return 0.1  # Small default variance
 
     # ============================================================================
-    # STEP 3: MODALITY MASK CREATION
+    # STEP 4: SAMPLING (BOOTSTRAP)
     # ============================================================================
     
     def _create_modality_masks(self, dropout_rates: np.ndarray) -> List[Dict[str, bool]]:
@@ -735,10 +863,6 @@ class BagGeneration:
         logger.info(f"Created modality masks for {len(modality_masks)} bags")
         return modality_masks
 
-    # ============================================================================
-    # STEP 4: SAMPLING (BOOTSTRAP)
-    # ============================================================================
-    
     def _bootstrap_sampling(self) -> List[np.ndarray]:
         """
         Step 4: Robust Bootstrap Sampling with Guaranteed Consistency.
@@ -750,9 +874,19 @@ class BagGeneration:
         modality_sample_counts = {name: len(data) for name, data in self.train_data.items()}
         label_count = len(self.train_labels)
         
+        # Defensive programming: Check for empty data
+        if not modality_sample_counts:
+            raise ValueError("No modality data available for bootstrap sampling")
+        if label_count == 0:
+            raise ValueError("No training labels available for bootstrap sampling")
+        
         # Find the minimum sample count across all data sources
         all_counts = list(modality_sample_counts.values()) + [label_count]
         dataset_size = min(all_counts)
+        
+        # Defensive programming: Ensure we have valid data
+        if dataset_size <= 0:
+            raise ValueError(f"Invalid dataset size: {dataset_size}. All modalities and labels must have positive sample counts.")
         
         if len(set(all_counts)) > 1:
             logger.warning(f"Inconsistent sample counts: {modality_sample_counts}, labels: {label_count}")
@@ -812,6 +946,9 @@ class BagGeneration:
                 for name, is_active in modality_masks[bag_id].items():
                     modality_weights[name] = 1.0 / active_count if is_active else 0.0
             
+            # Calculate diversity score for this bag
+            diversity_score = self._calculate_bag_diversity(modality_masks[bag_id], bag_id)
+            
             # Create bag configuration
             bag = BagConfig(
                 bag_id=bag_id,
@@ -820,7 +957,7 @@ class BagGeneration:
                 modality_weights=modality_weights,
                 dropout_rate=dropout_rates[bag_id],
                 sample_ratio=self.sample_ratio,
-                diversity_score=0.0,  # Will be calculated later if needed
+                diversity_score=diversity_score,
                 creation_timestamp=time.strftime('%Y-%m-%d %H:%M:%S'),
                 metadata={}
             )
@@ -846,55 +983,62 @@ class BagGeneration:
         
         logger.info(f"Extracted and stored data for {len(self.bags)} bags")
 
+    def _calculate_bag_diversity(self, modality_mask: Dict[str, bool], bag_id: int) -> float:
+        """
+        Calculate diversity score for a bag based on modality combination uniqueness.
+        
+        Parameters
+        ----------
+        modality_mask : Dict[str, bool]
+            Boolean mask indicating active modalities
+        bag_id : int
+            ID of the bag
+            
+        Returns
+        -------
+        float
+            Diversity score between 0.0 and 1.0
+        """
+        try:
+            # Get active modalities
+            active_modalities = [name for name, active in modality_mask.items() if active]
+            n_active = len(active_modalities)
+            
+            if n_active == 0:
+                return 0.0
+            
+            # Base diversity from number of active modalities
+            modality_diversity = n_active / self.n_modalities
+            
+            # Calculate combination uniqueness (how rare this combination is)
+            combination = tuple(sorted(active_modalities))
+            
+            # Count how many other bags have the same combination
+            same_combination_count = 0
+            for other_bag in self.bags:
+                if other_bag.bag_id != bag_id:
+                    other_active = [name for name, active in other_bag.modality_mask.items() if active]
+                    other_combination = tuple(sorted(other_active))
+                    if other_combination == combination:
+                        same_combination_count += 1
+            
+            # Uniqueness score (higher is more unique)
+            uniqueness_score = 1.0 / (1.0 + same_combination_count)
+            
+            # Combine modality diversity and uniqueness
+            diversity_score = (modality_diversity * 0.6 + uniqueness_score * 0.4)
+            
+            return float(np.clip(diversity_score, 0.0, 1.0))
+            
+        except Exception as e:
+            logger.warning(f"Error calculating diversity score for bag {bag_id}: {e}")
+            return 0.5  # Default moderate diversity
+
     # ============================================================================
     # STEP 6: CONVENIENCE FUNCTIONS
     # ============================================================================
     
-    def _collect_interpretability_data(self):
-        """Collect comprehensive interpretability data for analysis."""
-        logger.info("Collecting interpretability data")
-        
-        # Store modality importance scores
-        self._interpretability_data['modality_importance'] = self.modality_importance.copy()
-        
-        # Store detailed bag information
-        detailed_bags = []
-        for bag in self.bags:
-            detailed_bag = {
-                'bag_id': bag.bag_id,
-                'data_indices': bag.data_indices,
-                'modality_mask': bag.modality_mask,
-                'modality_weights': bag.modality_weights,
-                'dropout_rate': bag.dropout_rate,
-                'sample_ratio': bag.sample_ratio,
-                'diversity_score': bag.diversity_score,
-                'creation_timestamp': bag.creation_timestamp,
-                'sample_count': len(bag.data_indices)
-            }
-            detailed_bags.append(detailed_bag)
-        
-        self._interpretability_data['detailed_bags'] = detailed_bags
-        
-        # Store ensemble-level statistics
-        dropout_rates = [bag.dropout_rate for bag in self.bags]
-        self._interpretability_data['ensemble_statistics'] = {
-            'mean_dropout_rate': np.mean(dropout_rates),
-            'std_dropout_rate': np.std(dropout_rates),
-            'min_dropout_rate': np.min(dropout_rates),
-            'max_dropout_rate': np.max(dropout_rates),
-            'total_bags': len(self.bags),
-            'strategy': self.dropout_strategy
-        }
-        
-        # Store modality coverage statistics
-        modality_coverage = {}
-        for name in self.modality_names:
-            coverage = sum(1 for bag in self.bags if bag.modality_mask.get(name, False))
-            modality_coverage[name] = coverage / len(self.bags)
-        
-        self._interpretability_data['modality_coverage'] = modality_coverage
-        
-        logger.info("Interpretability data collection completed")
+    
 
     # ============================================================================
     # DATA ACCESS METHODS
@@ -950,14 +1094,10 @@ class BagGeneration:
             'modality_importance': self.modality_importance
         }
 
-    def get_interpretability_data(self) -> Dict[str, Any]:
-        """Get comprehensive interpretability data."""
-        return self._interpretability_data.copy()
-
     def get_modality_importance(self) -> Dict[str, float]:
         """Get modality importance scores."""
         return self.modality_importance.copy()
-
+    
     # ============================================================================
     # TESTING FUNCTIONS
     # ============================================================================
@@ -1000,74 +1140,7 @@ class BagGeneration:
         return test_results
 
     # ============================================================================
-    # INTERPRETABILITY TESTS
-    # ============================================================================
-    
-    def interpretability_test(self) -> Dict[str, Any]:
-        """Run interpretability tests to analyze bag generation patterns."""
-        logger.info("Running interpretability tests")
-        
-        interpretability_results = {
-            'modality_importance_analysis': {},
-            'dropout_pattern_analysis': {},
-            'diversity_analysis': {},
-            'coverage_analysis': {}
-        }
-        
-        # Analyze modality importance
-        if self.modality_importance:
-            importance_scores = list(self.modality_importance.values())
-            interpretability_results['modality_importance_analysis'] = {
-                'mean_importance': np.mean(importance_scores),
-                'std_importance': np.std(importance_scores),
-                'min_importance': np.min(importance_scores),
-                'max_importance': np.max(importance_scores),
-                'importance_ranking': sorted(
-                    self.modality_importance.items(), 
-                    key=lambda x: x[1], 
-                    reverse=True
-                )
-            }
-        
-        # Analyze dropout patterns
-        dropout_rates = [bag.dropout_rate for bag in self.bags]
-        interpretability_results['dropout_pattern_analysis'] = {
-            'mean_dropout': np.mean(dropout_rates),
-            'std_dropout': np.std(dropout_rates),
-            'dropout_distribution': np.histogram(dropout_rates, bins=10)[0].tolist()
-        }
-        
-        # Analyze diversity
-        modality_combinations = set()
-        for bag in self.bags:
-            combination = tuple(sorted(
-                name for name, active in bag.modality_mask.items() if active
-            ))
-            modality_combinations.add(combination)
-        
-        interpretability_results['diversity_analysis'] = {
-            'unique_combinations': len(modality_combinations),
-            'max_possible_combinations': 2**self.n_modalities,
-            'diversity_ratio': len(modality_combinations) / (2**self.n_modalities),
-            'combinations': list(modality_combinations)
-        }
-        
-        # Analyze coverage
-        coverage_stats = {}
-        for name in self.modality_names:
-            coverage = sum(1 for bag in self.bags if bag.modality_mask.get(name, False))
-            coverage_stats[name] = {
-                'coverage_ratio': coverage / len(self.bags),
-                'total_usage': coverage
-            }
-        
-        interpretability_results['coverage_analysis'] = coverage_stats
-        
-        logger.info("Interpretability tests completed")
-        return interpretability_results
-
-    # ============================================================================
-    # ROBUSTNESS TESTS
+    # ROBUSTNESS and INTERPRETABILITY TESTS
     # ============================================================================
      
     def robustness_test(self, noise_level: float = 0.1) -> Dict[str, Any]:
@@ -1118,6 +1191,196 @@ class BagGeneration:
         
         logger.info(f"Robustness test completed: similarity = {rate_similarity:.3f}")
         return robustness_results
+
+    def interpretability_test(self, save_to_file: bool = False, output_dir: str = None) -> Dict[str, Any]:
+        """
+        Comprehensive interpretability test - collects data, runs analysis, and optionally saves to file.
+        
+        Parameters
+        ----------
+        save_to_file : bool, default=False
+            Whether to save results to a JSON file
+        output_dir : str, optional
+            Directory to save the file. If None, saves to current directory.
+            
+        Returns
+        -------
+        Dict[str, Any]
+            Comprehensive interpretability results including data and analysis
+        """
+        logger.info("Running comprehensive interpretability test")
+        
+        # Collect comprehensive interpretability data
+        interpretability_data = {
+            'modality_importance': self.modality_importance.copy(),
+            'bag_configurations': [],
+            'ensemble_statistics': {},
+            'modality_usage_patterns': {},
+            'dropout_patterns': {},
+            'diversity_scores': [],
+            'coverage_analysis': {},
+            'analysis': {}
+        }
+        
+        # Collect bag configuration data
+        for bag in self.bags:
+            bag_info = {
+                'bag_id': bag.bag_id,
+                'modality_mask': bag.modality_mask.copy(),
+                'dropout_rate': bag.dropout_rate,
+                'diversity_score': bag.diversity_score,
+                'sample_count': len(bag.data_indices),
+                'creation_timestamp': bag.creation_timestamp
+            }
+            interpretability_data['bag_configurations'].append(bag_info)
+        
+        # Collect ensemble statistics
+        dropout_rates = [bag.dropout_rate for bag in self.bags]
+        diversity_scores = [bag.diversity_score for bag in self.bags]
+        
+        interpretability_data['ensemble_statistics'] = {
+            'total_bags': len(self.bags),
+            'total_modalities': self.n_modalities,
+            'strategy_used': self.dropout_strategy,
+            'average_dropout_rate': np.mean(dropout_rates),
+            'std_dropout_rate': np.std(dropout_rates),
+            'min_dropout_rate': np.min(dropout_rates),
+            'max_dropout_rate': np.max(dropout_rates),
+            'average_diversity_score': np.mean(diversity_scores),
+            'std_diversity_score': np.std(diversity_scores)
+        }
+        
+        # Collect modality usage patterns
+        for modality_name in self.modality_names:
+            usage_count = sum(1 for bag in self.bags if bag.modality_mask.get(modality_name, False))
+            interpretability_data['modality_usage_patterns'][modality_name] = {
+                'usage_count': usage_count,
+                'usage_percentage': (usage_count / len(self.bags)) * 100,
+                'importance_score': self.modality_importance.get(modality_name, 0.0)
+            }
+        
+        # Collect dropout patterns
+        interpretability_data['dropout_patterns'] = {
+            'unique_combinations': len(set(tuple(sorted(bag.modality_mask.items())) for bag in self.bags)),
+            'dropout_rate_distribution': {
+                'mean': np.mean(dropout_rates),
+                'std': np.std(dropout_rates),
+                'min': np.min(dropout_rates),
+                'max': np.max(dropout_rates),
+                'median': np.median(dropout_rates)
+            }
+        }
+        
+        # Collect diversity scores
+        interpretability_data['diversity_scores'] = diversity_scores
+        
+        # Coverage analysis
+        total_modality_combinations = 2 ** self.n_modalities - 1  # All possible non-empty combinations
+        unique_combinations = len(set(tuple(sorted(bag.modality_mask.items())) for bag in self.bags))
+        interpretability_data['coverage_analysis'] = {
+            'total_possible_combinations': total_modality_combinations,
+            'unique_combinations_used': unique_combinations,
+            'coverage_percentage': (unique_combinations / total_modality_combinations) * 100,
+            'combination_efficiency': unique_combinations / len(self.bags)
+        }
+        
+        # Run comprehensive analysis
+        analysis_results = {
+            'modality_importance_analysis': {},
+            'dropout_pattern_analysis': {},
+            'diversity_analysis': {},
+            'coverage_analysis': {},
+            'strategy_effectiveness': {}
+        }
+        
+        # Modality importance analysis
+        importance_scores = list(self.modality_importance.values())
+        analysis_results['modality_importance_analysis'] = {
+            'most_important_modality': max(self.modality_importance.items(), key=lambda x: x[1]),
+            'least_important_modality': min(self.modality_importance.items(), key=lambda x: x[1]),
+            'importance_variance': np.var(importance_scores),
+            'importance_range': max(importance_scores) - min(importance_scores)
+        }
+        
+        # Dropout pattern analysis
+        analysis_results['dropout_pattern_analysis'] = {
+            'dropout_rate_variance': np.var(dropout_rates),
+            'dropout_rate_range': np.max(dropout_rates) - np.min(dropout_rates),
+            'dropout_consistency': 1 - np.std(dropout_rates) / np.mean(dropout_rates) if np.mean(dropout_rates) > 0 else 0
+        }
+        
+        # Diversity analysis
+        analysis_results['diversity_analysis'] = {
+            'diversity_variance': np.var(diversity_scores),
+            'diversity_range': np.max(diversity_scores) - np.min(diversity_scores),
+            'diversity_consistency': 1 - np.std(diversity_scores) / np.mean(diversity_scores) if np.mean(diversity_scores) > 0 else 0
+        }
+        
+        # Coverage analysis
+        coverage_percentage = interpretability_data['coverage_analysis']['coverage_percentage']
+        analysis_results['coverage_analysis'] = {
+            'coverage_efficiency': coverage_percentage,
+            'coverage_adequacy': 'Good' if coverage_percentage > 50 else 'Poor' if coverage_percentage < 20 else 'Moderate'
+        }
+        
+        # Strategy effectiveness analysis
+        if self.dropout_strategy == 'adaptive':
+            importance_variance = analysis_results['modality_importance_analysis']['importance_variance']
+            analysis_results['strategy_effectiveness'] = {
+                'adaptive_effectiveness': 'High' if importance_variance > 0.1 else 'Low',
+                'importance_differentiation': importance_variance
+            }
+        else:
+            analysis_results['strategy_effectiveness'] = {
+                'strategy_type': self.dropout_strategy,
+                'uniform_application': True
+            }
+        
+        interpretability_data['analysis'] = analysis_results
+        
+        # Save to file if requested
+        if save_to_file:
+            import json
+            import os
+            from datetime import datetime
+            
+            if output_dir is None:
+                output_dir = "."
+            
+            # Create output directory if it doesn't exist
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"interpretability_results_{self.dropout_strategy}_{timestamp}.json"
+            filepath = os.path.join(output_dir, filename)
+            
+            # Convert numpy types to Python types for JSON serialization
+            def convert_numpy_types(obj):
+                if isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                elif isinstance(obj, np.integer):
+                    return int(obj)
+                elif isinstance(obj, np.floating):
+                    return float(obj)
+                elif isinstance(obj, dict):
+                    return {key: convert_numpy_types(value) for key, value in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_numpy_types(item) for item in obj]
+                else:
+                    return obj
+            
+            serializable_data = convert_numpy_types(interpretability_data)
+            
+            with open(filepath, 'w') as f:
+                json.dump(serializable_data, f, indent=2)
+            
+            logger.info(f"Interpretability results saved to: {filepath}")
+            interpretability_data['saved_to_file'] = filepath
+        
+        logger.info("Interpretability test completed successfully")
+        return interpretability_data
+
 
     # ============================================================================
     # UTILITY FUNCTIONS
